@@ -31,6 +31,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import HamburgerMenu from '@/components/HamburgerMenu';
+import CuraAI from '@/components/CuraAI';
 
 export default function PatientDashboard() {
   const router = useRouter();
@@ -414,6 +415,9 @@ export default function PatientDashboard() {
         onLogout={handleLogout}
         unreadCount={unreadCount}
       />
+
+      {/* Cura AI Assistant */}
+      <CuraAI />
 
       {/* Main Content - responsive padding for hamburger menu */}
       <main className="pr-4 sm:pr-20 pl-4 sm:pl-8 py-4 sm:py-8">

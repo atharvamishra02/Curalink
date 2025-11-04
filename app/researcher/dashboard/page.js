@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import HamburgerMenu from '@/components/HamburgerMenu';
+import CuraAI from '@/components/CuraAI';
 
 export default function ResearcherDashboard() {
   const router = useRouter();
@@ -622,6 +623,9 @@ export default function ResearcherDashboard() {
         isResearcher={true}
         unreadCount={unreadCount}
       />
+
+      {/* Cura AI Assistant */}
+      <CuraAI />
 
       <div className="pr-4 sm:pr-20 pl-4 sm:pl-8 py-4 sm:py-8">
         <div className="max-w-7xl mx-auto">
