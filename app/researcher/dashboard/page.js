@@ -3268,24 +3268,169 @@ function FavoritesContent({ favorites }) {
     );
   }
 
+  // Separate favorites by type - use the 'type' field from API response
+  const trialFavorites = favorites.filter(fav => fav.type === 'trial');
+  const publicationFavorites = favorites.filter(fav => fav.type === 'publication');
+
   return (
-    <div className="space-y-4">
-      {favorites.map((favorite) => (
-        <Card key={favorite.id} className="p-6">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex-1">
-              <span className="text-xs text-gray-500 uppercase">{favorite.type}</span>
-              <h3 className="font-semibold text-lg mt-1">{favorite.title}</h3>
-            </div>
-            <Heart className="w-5 h-5 text-red-500 fill-current" />
+    <div className="space-y-8">
+      {/* Favorite Clinical Trials */}
+      {trialFavorites.length > 0 && (
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <Beaker className="w-6 h-6" />
+            Favorite Clinical Trials
+          </h2>
+          <div className="grid md:grid-cols-2 gap-6">
+            {trialFavorites.map((fav) => {
+              const trial = fav.data; // Use the data field from API response
+              if (!trial) return null;
+              
+              return (
+                <Card key={fav.id} className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex gap-2">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        trial.status === 'RECRUITING' ? 'bg-green-100 text-green-700' :
+                        trial.status === 'ACTIVE' ? 'bg-blue-100 text-blue-700' :
+                        trial.status === 'COMPLETED' ? 'bg-gray-100 text-gray-700' :
+                        'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {trial.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Heart className="w-5 h-5 fill-red-500 text-red-500" />
+                      <span className="text-xs text-gray-500">{trial.phase}</span>
+                    </div>
+                  </div>
+
+                  <h3 className="font-semibold text-lg mb-2">{trial.title}</h3>
+                  <p className="text-gray-600 text-sm mb-3 line-clamp-3">
+                    {trial.description || trial.summary || trial.briefSummary}
+                  </p>
+
+                  {trial.nctId && (
+                    <div className="mb-2">
+                      <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                        NCT ID: {trial.nctId}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="space-y-2 text-sm text-gray-600 mb-4">
+                    <div className="flex items-center">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      {trial.location || trial.locations || 'Location not specified'}
+                    </div>
+                    {trial.startDate && (
+                      <div className="flex items-center">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        {new Date(trial.startDate).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
+
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => {
+                      if (trial.url) {
+                        window.open(trial.url, '_blank');
+                      } else if (trial.nctId) {
+                        window.open(`https://clinicaltrials.gov/study/${trial.nctId}`, '_blank');
+                      }
+                    }}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-1" />
+                    View Details
+                  </Button>
+                </Card>
+              );
+            })}
           </div>
-          <p className="text-gray-600 text-sm mb-3">{favorite.description}</p>
-          <Button variant="outline" size="sm">
-            <ExternalLink className="w-4 h-4 mr-1" />
-            View
-          </Button>
+        </div>
+      )}
+
+      {/* Favorite Publications */}
+      {publicationFavorites.length > 0 && (
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <BookOpen className="w-6 h-6" />
+            Favorite Publications
+          </h2>
+          <div className="grid md:grid-cols-2 gap-6">
+            {publicationFavorites.map((fav) => {
+              const pub = fav.data; // Use the data field from API response
+              if (!pub) return null;
+              
+              return (
+                <Card key={fav.id} className="p-6">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-lg flex-1">{pub.title}</h3>
+                    <Heart className="w-5 h-5 fill-red-500 text-red-500 ml-2" />
+                  </div>
+                  
+                  <p className="text-sm text-gray-600 mb-3">
+                    {pub.journal} • {pub.publishedDate ? new Date(pub.publishedDate).toLocaleDateString() : pub.year || 'Date not available'}
+                  </p>
+                  
+                  {pub.authors && pub.authors.length > 0 && (
+                    <p className="text-xs text-gray-500 mb-2">
+                      Authors: {pub.authors.slice(0, 3).map(a => 
+                        typeof a === 'string' ? a : (a.name || a.fullName || `${a.foreName || ''} ${a.lastName || ''}`.trim())
+                      ).join(', ')}
+                      {pub.authors.length > 3 && ` +${pub.authors.length - 3} more`}
+                    </p>
+                  )}
+                  
+                  {pub.abstract && (
+                    <p className="text-gray-600 text-sm mb-3 line-clamp-3">{pub.abstract}</p>
+                  )}
+
+                  <div className="flex items-center gap-4 mb-3">
+                    {pub.doi && (
+                      <span className="text-xs text-gray-500">DOI: {pub.doi}</span>
+                    )}
+                    {pub.pmid && (
+                      <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                        PMID: {pub.pmid}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="w-full"
+                    onClick={() => {
+                      if (pub.url) {
+                        window.open(pub.url, '_blank');
+                      } else if (pub.pmid) {
+                        window.open(`https://pubmed.ncbi.nlm.nih.gov/${pub.pmid}/`, '_blank');
+                      } else if (pub.doi) {
+                        window.open(`https://doi.org/${pub.doi}`, '_blank');
+                      }
+                    }}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-1" />
+                    View Publication
+                  </Button>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {trialFavorites.length === 0 && publicationFavorites.length === 0 && (
+        <Card className="p-12 text-center">
+          <Heart className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold mb-2">No Favorites Yet</h3>
+          <p className="text-gray-600">Items you favorite will appear here</p>
         </Card>
-      ))}
+      )}
     </div>
   );
 }
