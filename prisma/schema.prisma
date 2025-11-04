@@ -1,0 +1,435 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PATIENT
+  RESEARCHER
+}
+
+enum TrialStatus {
+  RECRUITING
+  NOT_YET_RECRUITING
+  ACTIVE
+  ACTIVE_NOT_RECRUITING
+  COMPLETED
+  TERMINATED
+  SUSPENDED
+  WITHDRAWN
+  ENROLLING_BY_INVITATION
+  UNKNOWN
+}
+
+enum TrialPhase {
+  EARLY_PHASE_1
+  PHASE_1
+  PHASE_2
+  PHASE_3
+  PHASE_4
+  NOT_APPLICABLE
+}
+
+enum MeetingStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COMPLETED
+}
+
+enum NotificationType {
+  NEW_FOLLOWER
+  NUDGE
+  MEETING_REQUEST
+  MEETING_ACCEPTED
+  MEETING_REJECTED
+  NEW_MESSAGE
+  FORUM_REPLY
+  SYSTEM
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String
+  role          UserRole
+  avatar        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Patient specific fields
+  patientProfile   PatientProfile?
+  
+  // Researcher specific fields
+  researcherProfile ResearcherProfile?
+
+  // Common relations
+  favorites        Favorite[]
+  forumPosts       ForumPost[]
+  forumComments    ForumComment[]
+  meetingRequests  MeetingRequest[] @relation("MeetingRequester")
+  receivedMeetingRequests MeetingRequest[] @relation("MeetingExpert")
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+  connections      Connection[] @relation("UserConnections")
+  connectedBy      Connection[] @relation("ConnectedUsers")
+  followers        Follow[] @relation("Following")
+  following        Follow[] @relation("Follower")
+  notifications    Notification[]
+  trialInquiries   TrialInquiry[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model PatientProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  conditions        String[] // Medical conditions
+  symptoms          String?  // Natural language symptoms
+  location          String?
+  city              String?
+  country           String?
+  
+  preferences       Json?    // Store additional preferences
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model ResearcherProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  specialties       String[]
+  researchInterests String[]
+  bio               String?
+  institution       String?
+  location          String?
+  
+  orcidId           String?
+  researchGateUrl   String?
+  googleScholarUrl  String?
+  
+  availableForMeetings Boolean @default(false)
+  meetingSchedule      String? // Available meeting times/schedule
+  
+  publications      Publication[]
+  clinicalTrials    ClinicalTrial[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+  @@index([specialties])
+}
+
+model Publication {
+  id            String   @id @default(cuid())
+  title         String
+  authors       String[]
+  abstract      String?
+  summary       String?  // AI-generated summary
+  url           String?
+  doi           String?  @unique
+  publishedDate DateTime?
+  journal       String?
+  keywords      String[]
+  
+  researcherId  String?
+  researcher    ResearcherProfile? @relation(fields: [researcherId], references: [id], onDelete: SetNull)
+  
+  favorites     Favorite[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([title])
+  @@index([keywords])
+  @@index([researcherId])
+}
+
+model ClinicalTrial {
+  id               String       @id @default(cuid())
+  nctId            String?      @unique // ClinicalTrials.gov ID
+  title            String
+  description      String
+  summary          String?      // AI-generated summary
+  
+  phase            TrialPhase?
+  status           TrialStatus  @default(RECRUITING)
+  
+  conditions       String[]
+  interventions    String[]
+  eligibilityCriteria String?
+  
+  location         String?
+  city             String?
+  country          String?
+  
+  contactEmail     String?
+  contactPhone     String?
+  
+  startDate        DateTime?
+  completionDate   DateTime?
+  enrollmentCount  Int?
+  
+  url              String?
+  
+  researcherId     String?
+  researcher       ResearcherProfile? @relation(fields: [researcherId], references: [id], onDelete: SetNull)
+  
+  favorites        Favorite[]
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([status])
+  @@index([conditions])
+  @@index([location])
+  @@index([researcherId])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Polymorphic relations
+  publicationId   String?
+  publication     Publication? @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  
+  clinicalTrialId String?
+  clinicalTrial   ClinicalTrial? @relation(fields: [clinicalTrialId], references: [id], onDelete: Cascade)
+  
+  expertId        String? // For saving health experts/collaborators
+  
+  // For external items (from PubMed, ClinicalTrials.gov, etc.)
+  externalId      String? // Store string IDs like "researcher-sarah-goldberg"
+  externalType    String? // Store type: "researcher", "trial", "publication"
+  externalData    Json?   // Store the full external item data
+  
+  createdAt       DateTime @default(now())
+
+  @@unique([userId, publicationId])
+  @@unique([userId, clinicalTrialId])
+  @@unique([userId, expertId])
+  @@unique([userId, externalId, externalType])
+  @@index([userId])
+}
+
+model ForumCategory {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  description String?
+  slug        String      @unique
+  icon        String?
+  
+  posts       ForumPost[]
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([slug])
+}
+
+model ForumPost {
+  id          String        @id @default(cuid())
+  title       String
+  content     String
+  
+  authorId    String
+  author      User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  categoryId  String
+  category    ForumCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  comments    ForumComment[]
+  
+  views       Int           @default(0)
+  isPinned    Boolean       @default(false)
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([createdAt])
+}
+
+model ForumComment {
+  id        String    @id @default(cuid())
+  content   String
+  
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  postId    String
+  post      ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([authorId])
+  @@index([postId])
+}
+
+model MeetingRequest {
+  id            String         @id @default(cuid())
+  
+  requesterId   String
+  requester     User           @relation("MeetingRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  
+  expertId      String
+  expert        User           @relation("MeetingExpert", fields: [expertId], references: [id], onDelete: Cascade)
+  
+  status        MeetingStatus  @default(PENDING)
+  message       String?
+  
+  preferredDate DateTime?
+  preferredTime String?
+  
+  meetingDate   DateTime?
+  meetingUrl    String?
+  
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([requesterId])
+  @@index([expertId])
+  @@index([status])
+}
+
+model Connection {
+  id          String   @id @default(cuid())
+  
+  userId      String
+  user        User     @relation("UserConnections", fields: [userId], references: [id], onDelete: Cascade)
+  
+  connectedId String
+  connected   User     @relation("ConnectedUsers", fields: [connectedId], references: [id], onDelete: Cascade)
+  
+  status      String   @default("pending") // pending, accepted, rejected
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, connectedId])
+  @@index([userId])
+  @@index([connectedId])
+  @@index([status])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  
+  senderId   String
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  
+  receiverId String
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  content    String
+  isRead     Boolean  @default(false)
+  
+  createdAt  DateTime @default(now())
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([createdAt])
+}
+
+model SearchHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  query     String
+  type      String   // publication, trial, expert
+  results   Json?
+  
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  
+  followerId  String
+  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  
+  followingId String
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model Notification {
+  id        String            @id @default(cuid())
+  
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type      NotificationType
+  title     String
+  message   String
+  
+  read      Boolean           @default(false)
+  
+  metadata  Json?             // Store additional data like senderId, meetingRequestId, etc.
+  
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+}
+
+model TrialInquiry {
+  id              String    @id @default(cuid())
+  
+  patientId       String
+  patient         User      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  trialId         String?   // Optional - might be external trial
+  trialTitle      String
+  trialNctId      String?
+  trialLocation   String?
+  
+  subject         String
+  message         String    @db.Text
+  
+  // Patient details at time of inquiry
+  patientName     String?
+  patientEmail    String?
+  patientCondition String?
+  patientAge      Int?
+  patientGender   String?
+  patientLocation String?
+  
+  status          String    @default("PENDING") // PENDING, RESPONDED, CLOSED
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([patientId])
+  @@index([trialId])
+  @@index([status])
+  @@index([createdAt])
+}
