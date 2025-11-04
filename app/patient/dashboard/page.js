@@ -415,18 +415,18 @@ export default function PatientDashboard() {
         unreadCount={unreadCount}
       />
 
-      {/* Main Content - with right padding for hamburger menu */}
-      <main className="pr-20 pl-8 py-8">
+      {/* Main Content - responsive padding for hamburger menu */}
+      <main className="pr-4 sm:pr-20 pl-4 sm:pl-8 py-4 sm:py-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-6 sm:mb-8"
         >
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-2">
             {getSectionTitle()}
           </h1>
-          <p className="text-gray-600">{getSectionDescription()}</p>
+          <p className="text-sm sm:text-base text-gray-600">{getSectionDescription()}</p>
           
           {/* Debug: Show location filter status */}
           {(activeSection === 'researchers' || activeSection === 'experts') && (
@@ -449,9 +449,9 @@ export default function PatientDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="mb-6 space-y-4"
+          className="mb-4 sm:mb-6 space-y-4"
         >
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -469,7 +469,7 @@ export default function PatientDashboard() {
               </div>
             </div>
             {(activeSection === 'trials' || activeSection === 'researchers' || activeSection === 'experts') && (
-              <div className="w-64">
+              <div className="w-full sm:w-64">
                 <div className="relative">
                   <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <Input
@@ -492,7 +492,7 @@ export default function PatientDashboard() {
                 <select
                   value={phaseFilter}
                   onChange={(e) => setPhaseFilter(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">All Phases</option>
                   <option value="EARLY_PHASE_1">Early Phase 1</option>
@@ -505,7 +505,7 @@ export default function PatientDashboard() {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">All Status</option>
                   <option value="RECRUITING">Recruiting</option>
@@ -521,7 +521,7 @@ export default function PatientDashboard() {
                 </select>
               </>
             )}
-            <Button onClick={applyFilters} className="whitespace-nowrap">
+            <Button onClick={applyFilters} className="w-full sm:w-auto whitespace-nowrap">
               <Filter className="w-4 h-4 mr-2" />
               Apply
             </Button>
@@ -676,18 +676,18 @@ function DashboardContent({ data, onSectionChange }) {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg"
+        className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg"
       >
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h3 className="text-2xl font-bold mb-2">Find Expert Doctors Near You</h3>
-            <p className="text-blue-100">
+            <h3 className="text-xl sm:text-2xl font-bold mb-2">Find Expert Doctors Near You</h3>
+            <p className="text-blue-100 text-sm sm:text-base">
               Connect with specialists who match your conditions and are closest to your location
             </p>
           </div>
           <Button
             onClick={() => onSectionChange('experts')}
-            className="bg-white text-blue-600 hover:bg-blue-50 font-semibold px-6 py-3 shadow-md"
+            className="bg-white text-blue-600 hover:bg-blue-50 font-semibold px-4 sm:px-6 py-2 sm:py-3 shadow-md w-full sm:w-auto"
           >
             <Users className="w-5 h-5 mr-2" />
             Find Experts
@@ -697,12 +697,12 @@ function DashboardContent({ data, onSectionChange }) {
 
       {/* Experts Section */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <Users className="w-6 h-6 text-blue-600" />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <Users className="w-5 sm:w-6 h-5 sm:h-6 text-blue-600" />
             Recommended Researchers
           </h2>
-          <Button variant="outline" onClick={() => onSectionChange('researchers')}>
+          <Button variant="outline" onClick={() => onSectionChange('researchers')} className="w-full sm:w-auto">
             View All
           </Button>
         </div>
@@ -712,9 +712,9 @@ function DashboardContent({ data, onSectionChange }) {
           ))}
         </div>
         {(!data.researchers || data.researchers.length === 0) && (
-          <Card className="p-8 text-center">
-            <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">No researchers found. Try adjusting your conditions.</p>
+          <Card className="p-6 sm:p-8 text-center">
+            <Users className="w-10 sm:w-12 h-10 sm:h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm sm:text-base text-gray-500">No researchers found. Try adjusting your conditions.</p>
           </Card>
         )}
       </div>

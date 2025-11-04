@@ -623,19 +623,19 @@ export default function ResearcherDashboard() {
         unreadCount={unreadCount}
       />
 
-      <div className="pr-20 pl-8 py-8">
+      <div className="pr-4 sm:pr-20 pl-4 sm:pl-8 py-4 sm:py-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+          <div className="mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-2">
               {getSectionTitle()}
             </h1>
-            <p className="text-lg text-gray-600">{getSectionDescription()}</p>
+            <p className="text-base sm:text-lg text-gray-600">{getSectionDescription()}</p>
           </div>
 
           {/* Search Bar (for trials section) */}
           {activeSection === 'trials' && (
-            <div className="mb-6">
+            <div className="mb-4 sm:mb-6">
               <div className="relative max-w-2xl">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <Input
@@ -643,7 +643,7 @@ export default function ResearcherDashboard() {
                   placeholder="Search clinical trials by condition or topic..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-12 pr-4 py-3 w-full"
+                  className="pl-12 pr-20 sm:pr-4 py-3 w-full"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       fetchMyTrials();
@@ -663,7 +663,7 @@ export default function ResearcherDashboard() {
 
           {/* Search Bar (for publications section) */}
           {activeSection === 'publications' && (
-            <div className="mb-6">
+            <div className="mb-4 sm:mb-6">
               <div className="relative max-w-2xl">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <Input
@@ -671,7 +671,7 @@ export default function ResearcherDashboard() {
                   placeholder="Search publications by topic or keyword..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-12 pr-4 py-3 w-full"
+                  className="pl-12 pr-20 sm:pr-4 py-3 w-full"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       fetchPublications();
@@ -1888,10 +1888,32 @@ function CollaboratorsContent({ collaborators }) {
 }
 
 // Trial Card Component with AI Summary
-function TrialCard({ trial, isUserTrial, toggleFavorite, isFavorited }) {
+function TrialCard({ trial, isUserTrial, toggleFavorite, isFavorited, onTrialUpdated }) {
   const [showAiSummary, setShowAiSummary] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editData, setEditData] = useState({});
+  const [saving, setSaving] = useState(false);
+  
   const trialId = trial.id || trial.nctId;
   const favorited = isFavorited('trial', trialId);
+  
+  // Initialize edit data when modal opens
+  useEffect(() => {
+    if (showEditModal) {
+      setEditData({
+        title: trial.title || '',
+        description: trial.description || '',
+        condition: trial.condition || '',
+        phase: trial.phase || 'PHASE_1',
+        status: trial.status || 'RECRUITING',
+        location: trial.location || '',
+        startDate: trial.startDate ? new Date(trial.startDate).toISOString().split('T')[0] : '',
+        endDate: trial.endDate ? new Date(trial.endDate).toISOString().split('T')[0] : '',
+        eligibilityCriteria: trial.eligibilityCriteria || ''
+      });
+    }
+  }, [showEditModal, trial]);
   
   // Generate AI-friendly summary
   const getAiSummary = () => {
@@ -1905,6 +1927,34 @@ function TrialCard({ trial, isUserTrial, toggleFavorite, isFavorited }) {
     const locationLine = trial.location ? `Location: ${trial.location}.` : '';
     
     return `${phaseLine} ${statusLine} ${locationLine}`.trim();
+  };
+
+  // Handle edit submission
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+
+    try {
+      const response = await fetch(`/api/researcher/trials/${trial.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editData)
+      });
+
+      if (response.ok) {
+        alert('Trial updated successfully!');
+        setShowEditModal(false);
+        if (onTrialUpdated) onTrialUpdated();
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to update trial: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error updating trial');
+    } finally {
+      setSaving(false);
+    }
   };
   
   return (
@@ -1991,9 +2041,7 @@ function TrialCard({ trial, isUserTrial, toggleFavorite, isFavorited }) {
             variant="outline" 
             size="sm" 
             className="flex-1"
-            onClick={() => {
-              alert(`Edit functionality coming soon for: ${trial.title}`);
-            }}
+            onClick={() => setShowEditModal(true)}
           >
             <Edit className="w-4 h-4 mr-1" />
             Edit
@@ -2004,12 +2052,12 @@ function TrialCard({ trial, isUserTrial, toggleFavorite, isFavorited }) {
           size="sm" 
           className="flex-1"
           onClick={() => {
-            if (trial.url) {
+            if (trial.url && !isUserTrial) {
               window.open(trial.url, '_blank');
-            } else if (trial.nctId) {
+            } else if (trial.nctId && !isUserTrial) {
               window.open(`https://clinicaltrials.gov/study/${trial.nctId}`, '_blank');
             } else {
-              alert(`Trial: ${trial.title}\n\nDescription: ${trial.description || trial.summary}\n\nLocation: ${trial.location}\nStatus: ${trial.status}\nPhase: ${trial.phase}`);
+              setShowViewModal(true);
             }
           }}
         >
@@ -2017,6 +2065,250 @@ function TrialCard({ trial, isUserTrial, toggleFavorite, isFavorited }) {
           View
         </Button>
       </div>
+
+      {/* View Modal */}
+      {showViewModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white">
+              <h2 className="text-2xl font-bold">{trial.title}</h2>
+              <button onClick={() => setShowViewModal(false)} className="text-gray-500 hover:text-gray-700">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Status and Phase */}
+              <div className="flex gap-3 flex-wrap">
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  trial.status === 'RECRUITING' ? 'bg-green-100 text-green-700' :
+                  trial.status === 'ACTIVE' ? 'bg-blue-100 text-blue-700' :
+                  trial.status === 'COMPLETED' ? 'bg-gray-100 text-gray-700' :
+                  'bg-yellow-100 text-yellow-700'
+                }`}>
+                  {trial.status}
+                </span>
+                <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-700">
+                  {trial.phase}
+                </span>
+                {trial.nctId && (
+                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-700">
+                    NCT: {trial.nctId}
+                  </span>
+                )}
+              </div>
+
+              {/* Description */}
+              <div>
+                <h3 className="text-lg font-semibold mb-2 text-gray-800">Description</h3>
+                <p className="text-gray-600 leading-relaxed">{trial.description || trial.summary || 'No description available'}</p>
+              </div>
+
+              {/* Condition */}
+              {trial.condition && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2 text-gray-800">Condition</h3>
+                  <p className="text-gray-600">{trial.condition}</p>
+                </div>
+              )}
+
+              {/* Location and Dates */}
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2 text-gray-800">Location</h3>
+                  <div className="flex items-center text-gray-600">
+                    <MapPin className="w-5 h-5 mr-2" />
+                    {trial.location || 'Not specified'}
+                  </div>
+                </div>
+                
+                {(trial.startDate || trial.endDate) && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2 text-gray-800">Timeline</h3>
+                    <div className="space-y-2 text-gray-600">
+                      {trial.startDate && (
+                        <div className="flex items-center">
+                          <Calendar className="w-5 h-5 mr-2" />
+                          <span>Start: {new Date(trial.startDate).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      {trial.endDate && (
+                        <div className="flex items-center">
+                          <Calendar className="w-5 h-5 mr-2" />
+                          <span>End: {new Date(trial.endDate).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Eligibility Criteria */}
+              {trial.eligibilityCriteria && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2 text-gray-800">Eligibility Criteria</h3>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-gray-700 whitespace-pre-line leading-relaxed">{trial.eligibilityCriteria}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* External Link */}
+              {(trial.url || trial.nctId) && (
+                <div className="pt-4 border-t">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      if (trial.url) {
+                        window.open(trial.url, '_blank');
+                      } else if (trial.nctId) {
+                        window.open(`https://clinicaltrials.gov/study/${trial.nctId}`, '_blank');
+                      }
+                    }}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View on ClinicalTrials.gov
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t bg-gray-50">
+              <Button onClick={() => setShowViewModal(false)} className="w-full">
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && isUserTrial && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white">
+              <h2 className="text-2xl font-bold">Edit Clinical Trial</h2>
+              <button onClick={() => setShowEditModal(false)} className="text-gray-500 hover:text-gray-700">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Trial Title *</label>
+                <Input
+                  value={editData.title || ''}
+                  onChange={(e) => setEditData({ ...editData, title: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Description *</label>
+                <textarea
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  rows={4}
+                  value={editData.description || ''}
+                  onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Condition *</label>
+                  <Input
+                    value={editData.condition || ''}
+                    onChange={(e) => setEditData({ ...editData, condition: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Phase *</label>
+                  <select
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                    value={editData.phase || 'PHASE_1'}
+                    onChange={(e) => setEditData({ ...editData, phase: e.target.value })}
+                    required
+                  >
+                    <option value="PHASE_1">Phase 1</option>
+                    <option value="PHASE_2">Phase 2</option>
+                    <option value="PHASE_3">Phase 3</option>
+                    <option value="PHASE_4">Phase 4</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Status *</label>
+                  <select
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                    value={editData.status || 'RECRUITING'}
+                    onChange={(e) => setEditData({ ...editData, status: e.target.value })}
+                    required
+                  >
+                    <option value="RECRUITING">Recruiting</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="SUSPENDED">Suspended</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Location *</label>
+                  <Input
+                    value={editData.location || ''}
+                    onChange={(e) => setEditData({ ...editData, location: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Start Date</label>
+                  <Input
+                    type="date"
+                    value={editData.startDate || ''}
+                    onChange={(e) => setEditData({ ...editData, startDate: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">End Date</label>
+                  <Input
+                    type="date"
+                    value={editData.endDate || ''}
+                    onChange={(e) => setEditData({ ...editData, endDate: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Eligibility Criteria</label>
+                <textarea
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 font-mono text-sm"
+                  rows={10}
+                  value={editData.eligibilityCriteria || ''}
+                  onChange={(e) => setEditData({ ...editData, eligibilityCriteria: e.target.value })}
+                  placeholder="Inclusion Criteria:&#10;&#10;• Adults aged 30–70 years with confirmed solid tumors&#10;• Patients eligible for either immunotherapy or chemotherapy regimens&#10;&#10;Exclusion Criteria:&#10;&#10;• Pre-existing cardiovascular disease"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button type="submit" disabled={saving} className="flex-1">
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setShowEditModal(false)} className="flex-1">
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
@@ -2093,7 +2385,14 @@ function TrialsContent({ userTrials, externalTrials, onRefresh, onUserDataRefres
 
   const renderTrialCard = (trial, isUserTrial = false) => {
     const trialId = trial.id || trial.nctId;
-    return <TrialCard key={trialId} trial={trial} isUserTrial={isUserTrial} toggleFavorite={toggleFavorite} isFavorited={isFavorited} />;
+    return <TrialCard 
+      key={trialId} 
+      trial={trial} 
+      isUserTrial={isUserTrial} 
+      toggleFavorite={toggleFavorite} 
+      isFavorited={isFavorited}
+      onTrialUpdated={onRefresh}
+    />;
   };
 
   return (
