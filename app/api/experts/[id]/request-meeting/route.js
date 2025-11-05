@@ -100,15 +100,15 @@ export async function POST(request, { params }) {
     });
 
     // Create notification for the expert
-    const expert = await prisma.user.findUnique({
+    const expertUser = await prisma.user.findUnique({
       where: { id: expertId },
       include: { researcherProfile: true }
     });
 
-    const sendToAdmin = !expert || !expert.researcherProfile?.availableForMeetings;
+    const sendToAdmin = !expertUser || !expertUser.researcherProfile?.availableForMeetings;
 
     // If expert is available, notify them
-    if (expert && expert.researcherProfile?.availableForMeetings) {
+    if (expertUser && expertUser.researcherProfile?.availableForMeetings) {
       await prisma.notification.create({
         data: {
           userId: expertId,
