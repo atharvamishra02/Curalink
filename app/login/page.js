@@ -38,7 +38,9 @@ export default function LoginPage() {
 
       if (response.ok) {
         // Redirect based on role
-        if (data.user.role === 'RESEARCHER') {
+        if (data.user.role === 'ADMIN') {
+          router.push('/admin/dashboard');
+        } else if (data.user.role === 'RESEARCHER') {
           router.push('/researcher/dashboard');
         } else {
           router.push('/patient/dashboard');

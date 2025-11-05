@@ -34,6 +34,32 @@ export async function GET(request) {
       take: 50
     });
 
+    // Enrich notifications with meeting request status
+    const enrichedNotifications = await Promise.all(
+      notifications.map(async (notification) => {
+        if (notification.type === 'MEETING_REQUEST' && notification.metadata?.meetingRequestId) {
+          try {
+            const meetingRequest = await prisma.meetingRequest.findUnique({
+              where: { id: notification.metadata.meetingRequestId }
+            });
+            
+            if (meetingRequest) {
+              return {
+                ...notification,
+                metadata: {
+                  ...notification.metadata,
+                  status: meetingRequest.status
+                }
+              };
+            }
+          } catch (error) {
+            console.error('Error fetching meeting status:', error);
+          }
+        }
+        return notification;
+      })
+    );
+
     const unreadCount = await prisma.notification.count({
       where: {
         userId: user.userId,
@@ -41,7 +67,7 @@ export async function GET(request) {
       }
     });
 
-    return NextResponse.json({ notifications, unreadCount });
+    return NextResponse.json({ notifications: enrichedNotifications, unreadCount });
   } catch (error) {
     console.error('Get notifications error:', error);
     return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 });

@@ -21,6 +21,7 @@ export default function PatientOnboarding() {
     name: '',
     email: '',
     password: '',
+    age: '',
     symptoms: '',
     conditions: [],
     city: '',
@@ -199,6 +200,15 @@ export default function PatientOnboarding() {
                       onChange={handleInputChange}
                       error={errors.password}
                       placeholder="••••••••"
+                    />
+                    <Input
+                      label="Age"
+                      name="age"
+                      type="number"
+                      value={formData.age}
+                      onChange={handleInputChange}
+                      error={errors.age}
+                      placeholder="Enter your age"
                     />
                   </div>
                 </motion.div>

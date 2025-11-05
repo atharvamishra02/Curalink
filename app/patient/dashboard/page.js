@@ -1988,6 +1988,7 @@ function ProfileContent({ user, onUpdate }) {
   const [formData, setFormData] = useState({
     name: user.name || '',
     email: user.email || '',
+    avatar: user.avatar || '',
     age: user.patientProfile?.age || '',
     gender: user.patientProfile?.gender || '',
     conditions: user.patientProfile?.conditions?.join(', ') || '',
@@ -2005,6 +2006,7 @@ function ProfileContent({ user, onUpdate }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formData.name,
+          avatar: formData.avatar || null,
           patientProfile: {
             age: parseInt(formData.age) || null,
             gender: formData.gender,
@@ -2035,9 +2037,17 @@ function ProfileContent({ user, onUpdate }) {
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div className="flex items-center gap-4">
-            <div className="w-20 h-20 bg-linear-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-3xl">
-              {user.name?.charAt(0).toUpperCase()}
-            </div>
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user.name}
+                className="w-20 h-20 rounded-full object-cover border-2 border-blue-200"
+              />
+            ) : (
+              <div className="w-20 h-20 bg-linear-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-3xl">
+                {user.name?.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div>
               <h2 className="text-3xl font-bold text-gray-900">{user.name}</h2>
               <p className="text-gray-600">{user.email}</p>
@@ -2056,6 +2066,35 @@ function ProfileContent({ user, onUpdate }) {
         {/* Profile Form */}
         {isEditing ? (
           <form onSubmit={handleSave} className="space-y-6">
+            {/* Avatar Section */}
+            <div className="border-b pb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Profile Picture URL
+              </label>
+              <Input
+                type="url"
+                value={formData.avatar}
+                onChange={(e) => setFormData({ ...formData, avatar: e.target.value })}
+                placeholder="https://example.com/your-photo.jpg"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Enter the URL of your profile picture (e.g., from Imgur, Cloudinary, or any public image hosting)
+              </p>
+              {formData.avatar && (
+                <div className="mt-3">
+                  <p className="text-xs text-gray-500 mb-2">Preview:</p>
+                  <img
+                    src={formData.avatar}
+                    alt="Avatar preview"
+                    className="w-20 h-20 rounded-full object-cover border-2 border-blue-200"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
@@ -2132,6 +2171,7 @@ function ProfileContent({ user, onUpdate }) {
                   setFormData({
                     name: user.name || '',
                     email: user.email || '',
+                    avatar: user.avatar || '',
                     age: user.patientProfile?.age || '',
                     gender: user.patientProfile?.gender || '',
                     conditions: user.patientProfile?.conditions?.join(', ') || '',
@@ -2152,8 +2192,12 @@ function ProfileContent({ user, onUpdate }) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">Gender</label>
-                <p className="text-gray-900 text-lg">{user.patientProfile?.gender || 'Not specified'}</p>
+                <label className="block text-sm font-medium text-gray-500 mb-1">Location</label>
+                <p className="text-gray-900 text-lg">
+                  {user.patientProfile?.city && user.patientProfile?.country 
+                    ? `${user.patientProfile.city}, ${user.patientProfile.country}`
+                    : 'Not specified'}
+                </p>
               </div>
             </div>
 
@@ -2174,6 +2218,13 @@ function ProfileContent({ user, onUpdate }) {
                 <p className="text-gray-900">No conditions specified</p>
               )}
             </div>
+
+            {user.patientProfile?.symptoms && (
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-1">Symptoms</label>
+                <p className="text-gray-900">{user.patientProfile.symptoms}</p>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-500 mb-1">Emergency Contact</label>

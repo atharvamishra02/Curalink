@@ -100,22 +100,64 @@ export async function POST(request, { params }) {
     });
 
     // Create notification for the expert
-    await prisma.notification.create({
-      data: {
-        userId: expertId,
-        type: 'MEETING_REQUEST',
-        title: 'New Meeting Request',
-        message: `${user.name} has requested a meeting with you`,
-        read: false,
-        metadata: {
-          meetingRequestId: meetingRequest.id,
-          requesterId: userId,
-          requesterName: user.name,
-          preferredDate: preferredDate,
-          preferredTime: preferredTime,
-        },
-      },
+    const expert = await prisma.user.findUnique({
+      where: { id: expertId },
+      include: { researcherProfile: true }
     });
+
+    const sendToAdmin = !expert || !expert.researcherProfile?.availableForMeetings;
+
+    // If expert is available, notify them
+    if (expert && expert.researcherProfile?.availableForMeetings) {
+      await prisma.notification.create({
+        data: {
+          userId: expertId,
+          type: 'MEETING_REQUEST',
+          title: 'New Meeting Request',
+          message: `${user.name} has requested a meeting with you`,
+          read: false,
+          metadata: {
+            meetingRequestId: meetingRequest.id,
+            requesterId: userId,
+            requesterName: user.name,
+            preferredDate: preferredDate,
+            preferredTime: preferredTime,
+          },
+        },
+      });
+    }
+
+    // Send to admin if expert is unavailable or external
+    if (sendToAdmin) {
+      const admins = await prisma.user.findMany({
+        where: { role: 'ADMIN' }
+      });
+
+      for (const admin of admins) {
+        await prisma.notification.create({
+          data: {
+            userId: admin.id,
+            type: 'MEETING_REQUEST',
+            title: expert 
+              ? `Meeting Request (Expert Unavailable) - ${expert.name}`
+              : `Meeting Request (External Expert)`,
+            message: expert
+              ? `${user.name} requested a meeting with ${expert.name} who is currently unavailable. Please assist.`
+              : `${user.name} requested a meeting with an external expert. Please coordinate this meeting.`,
+            read: false,
+            metadata: {
+              meetingRequestId: meetingRequest.id,
+              requesterId: userId,
+              targetExpertId: expertId,
+              isExternal: !expert,
+              requesterName: user.name,
+              preferredDate: preferredDate,
+              preferredTime: preferredTime,
+            },
+          },
+        });
+      }
+    }
 
     // Optionally, send email notification
     // await sendEmail({

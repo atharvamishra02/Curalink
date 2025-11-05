@@ -12,6 +12,7 @@ datasource db {
 enum UserRole {
   PATIENT
   RESEARCHER
+  ADMIN
 }
 
 enum TrialStatus {
@@ -82,6 +83,8 @@ model User {
   connectedBy      Connection[] @relation("ConnectedUsers")
   followers        Follow[] @relation("Following")
   following        Follow[] @relation("Follower")
+  followRequestsAsPatient    FollowRequest[] @relation("FollowRequestPatient")
+  followRequestsAsResearcher FollowRequest[] @relation("FollowRequestResearcher")
   notifications    Notification[]
   trialInquiries   TrialInquiry[]
 
@@ -94,11 +97,14 @@ model PatientProfile {
   userId            String   @unique
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
+  age               Int?     // Patient age
+  gender            String?  // Patient gender
   conditions        String[] // Medical conditions
   symptoms          String?  // Natural language symptoms
   location          String?
   city              String?
   country           String?
+  emergencyContact  String?  // Emergency contact information
   
   preferences       Json?    // Store additional preferences
   createdAt         DateTime @default(now())
@@ -291,8 +297,12 @@ model MeetingRequest {
   requesterId   String
   requester     User           @relation("MeetingRequester", fields: [requesterId], references: [id], onDelete: Cascade)
   
-  expertId      String
-  expert        User           @relation("MeetingExpert", fields: [expertId], references: [id], onDelete: Cascade)
+  expertId      String?
+  expert        User?          @relation("MeetingExpert", fields: [expertId], references: [id], onDelete: Cascade)
+  
+  // For external researchers not in the system
+  externalResearcherName  String?
+  externalResearcherId    String?  // ID from external source
   
   status        MeetingStatus  @default(PENDING)
   message       String?
@@ -377,6 +387,29 @@ model Follow {
   @@unique([followerId, followingId])
   @@index([followerId])
   @@index([followingId])
+}
+
+model FollowRequest {
+  id                       String   @id @default(cuid())
+  
+  patientId                String
+  patient                  User     @relation("FollowRequestPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  
+  researcherId             String?
+  researcher               User?    @relation("FollowRequestResearcher", fields: [researcherId], references: [id], onDelete: Cascade)
+  
+  externalResearcherName   String?
+  externalResearcherId     String?
+  
+  status                   MeetingStatus @default(PENDING)
+  message                  String?
+  adminResponse            String?
+  
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([researcherId])
 }
 
 model Notification {

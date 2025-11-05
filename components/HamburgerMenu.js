@@ -18,7 +18,8 @@ import {
   Bell,
   ArrowRightLeft,
   GraduationCap,
-  Settings
+  Settings,
+  Shield
 } from 'lucide-react';export default function HamburgerMenu({ activeSection, onSectionChange, user, onLogout, isResearcher = false, unreadCount: propUnreadCount }) {
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(propUnreadCount || 0);
@@ -304,6 +305,20 @@ import {
 
           {/* Footer Actions */}
           <div className="p-4 border-t border-gray-200 space-y-2">
+            {/* Admin Dashboard Button - Only show for ADMIN users */}
+            {user?.role === 'ADMIN' && (
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  router.push('/admin/dashboard');
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-purple-50 text-purple-600 transition-colors border-2 border-purple-200"
+              >
+                <Shield className="w-5 h-5" />
+                <span className="font-medium">Admin Dashboard</span>
+              </button>
+            )}
+            
             <button
               onClick={() => handleSectionClick('profile')}
               className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors"

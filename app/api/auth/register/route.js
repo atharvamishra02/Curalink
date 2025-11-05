@@ -8,7 +8,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { name, email, password, role, symptoms, conditions, city, country, specialties, researchInterests, bio, institution, orcidId, researchGateUrl, googleScholarUrl, availableForMeetings } = body;
+    const { name, email, password, role, age, symptoms, conditions, city, country, specialties, researchInterests, bio, institution, orcidId, researchGateUrl, googleScholarUrl, availableForMeetings } = body;
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -36,6 +36,7 @@ export async function POST(request) {
     if (role === 'PATIENT') {
       userData.patientProfile = {
         create: {
+          age: age ? parseInt(age) : null,
           conditions: conditions || [],
           symptoms: symptoms || '',
           city: city || '',

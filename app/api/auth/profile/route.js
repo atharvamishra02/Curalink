@@ -19,7 +19,7 @@ export async function PATCH(request) {
     const userId = decoded.userId;
 
     const body = await request.json();
-    const { name, patientProfile, researcherProfile } = body;
+    const { name, avatar, patientProfile, researcherProfile } = body;
 
     // Get current user to check role
     const currentUser = await prisma.user.findUnique({
@@ -37,8 +37,11 @@ export async function PATCH(request) {
       );
     }
 
-    // Update user name
+    // Update user data (name and avatar)
     const updateData = { name };
+    if (avatar !== undefined) {
+      updateData.avatar = avatar;
+    }
 
     // Update patient profile if patient
     if (currentUser.role === 'PATIENT' && patientProfile) {
