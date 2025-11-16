@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
+import { cache } from '@/lib/redis';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const CACHE_TTL = 5; // 5 seconds cache for notifications
 
 function getUserFromToken(request) {
   const token = request.cookies.get('token')?.value || request.cookies.get('auth-token')?.value;
@@ -22,6 +24,19 @@ export async function GET(request) {
     const user = getUserFromToken(request);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Try to get from cache first
+    const cacheKey = `notifications:${user.userId}`;
+    const cachedData = await cache.get(cacheKey);
+    
+    if (cachedData) {
+      return NextResponse.json(cachedData, {
+        headers: {
+          'Cache-Control': 'private, max-age=5',
+          'X-Cache': 'HIT'
+        }
+      });
     }
 
     const notifications = await prisma.notification.findMany({
@@ -67,7 +82,17 @@ export async function GET(request) {
       }
     });
 
-    return NextResponse.json({ notifications: enrichedNotifications, unreadCount });
+    const responseData = { notifications: enrichedNotifications, unreadCount };
+    
+    // Cache the response for 5 seconds
+    await cache.set(cacheKey, responseData, CACHE_TTL);
+
+    return NextResponse.json(responseData, {
+      headers: {
+        'Cache-Control': 'private, max-age=5',
+        'X-Cache': 'MISS'
+      }
+    });
   } catch (error) {
     console.error('Get notifications error:', error);
     return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 });
@@ -85,6 +110,10 @@ export async function PATCH(request) {
     const body = await request.json();
     const { notificationId, markAllAsRead } = body;
 
+    // Invalidate cache after updating
+    const cacheKey = `notifications:${user.userId}`;
+    const unreadCacheKey = `notifications:unread:${user.userId}`;
+
     if (markAllAsRead) {
       await prisma.notification.updateMany({
         where: {
@@ -95,6 +124,11 @@ export async function PATCH(request) {
           read: true
         }
       });
+      
+      // Invalidate both caches
+      await cache.del(cacheKey);
+      await cache.del(unreadCacheKey);
+      
       return NextResponse.json({ success: true, message: 'All notifications marked as read' });
     }
 
@@ -111,6 +145,10 @@ export async function PATCH(request) {
         read: true
       }
     });
+
+    // Invalidate both caches
+    await cache.del(cacheKey);
+    await cache.del(unreadCacheKey);
 
     return NextResponse.json({ success: true });
   } catch (error) {

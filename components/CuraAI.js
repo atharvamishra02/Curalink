@@ -46,15 +46,23 @@ export default function CuraAI() {
         body: JSON.stringify({ message: userMessage, history: messages }),
       });
 
-      if (!response.ok) throw new Error('Failed to get response');
-
       const data = await response.json();
+
+      if (!response.ok) {
+        // Show specific error message from API
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: `⚠️ ${data.error || 'Failed to get response. Please try again.'}` 
+        }]);
+        return;
+      }
+
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
     } catch (error) {
       console.error('Error:', error);
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: 'I apologize, but I encountered an error. Please try again.' 
+        content: '⚠️ I apologize, but I encountered a connection error. Please check your internet connection and try again.' 
       }]);
     } finally {
       setIsLoading(false);
@@ -63,18 +71,18 @@ export default function CuraAI() {
 
   return (
     <>
-      {/* Floating AI Button */}
+      {/* Floating AI Button - Middle position */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-4 right-20 z-50 p-3 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 group"
+        className="fixed top-4 right-[52px] sm:right-[58px] z-50 p-2 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 group"
         aria-label="Cura AI Assistant"
       >
         {isOpen ? (
-          <X className="w-6 h-6 text-white" />
+          <X className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
         ) : (
           <div className="relative">
-            <Bot className="w-6 h-6 text-white" />
-            <Sparkles className="w-3 h-3 text-yellow-300 absolute -top-1 -right-1 animate-pulse" />
+            <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+            <Sparkles className="w-2 h-2 text-yellow-300 absolute -top-1 -right-1 animate-pulse" />
           </div>
         )}
       </button>
@@ -82,14 +90,9 @@ export default function CuraAI() {
       {/* AI Chat Panel */}
       {isOpen && (
         <>
-          {/* Overlay */}
-          <div
-            className="fixed inset-0 bg-black bg-opacity-30 z-40"
-            onClick={() => setIsOpen(false)}
-          />
 
-          {/* Chat Window */}
-          <div className="fixed top-20 right-4 w-96 h-[600px] z-50 bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+          {/* Chat Window - Responsive */}
+          <div className="fixed top-16 sm:top-20 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 h-[70vh] sm:h-[600px] z-50 bg-white rounded-xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-500 to-indigo-600 p-4 text-white">
               <div className="flex items-center justify-between">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
@@ -25,25 +25,71 @@ import {
   Trash2,
   Bell,
   Calendar,
-  CheckCircle
+  CheckCircle,
+  Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import HamburgerMenu from '@/components/HamburgerMenu';
 import CuraAI from '@/components/CuraAI';
+import NotificationBell from '@/components/NotificationBell';
+import ResearcherProfileModal from '@/components/ResearcherProfileModal';
+import { useToast } from '@/components/ToastProvider';
 
 export default function PatientDashboard() {
   const router = useRouter();
+  const toast = useToast();
   
   const [user, setUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSection, setActiveSection] = useState('dashboard');
   const [locationFilter, setLocationFilter] = useState('');
   const [conditionFilters, setConditionFilters] = useState([]);
-    const [phaseFilter, setPhaseFilter] = useState('');
+  const [phaseFilter, setPhaseFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Source filters for researchers and publications
+  const [researcherSource, setResearcherSource] = useState('all'); // 'all', 'internal', 'pubmed', 'scholar', 'orcid'
+  const [publicationSource, setPublicationSource] = useState('all'); // 'all', 'internal', 'pubmed', 'researchgate', 'orcid', 'arxiv'
+  const [trialSource, setTrialSource] = useState('all'); // 'all', 'internal', 'clinicaltrials', 'pubmed', 'arxiv'
+  const [dateFilter, setDateFilter] = useState('all'); // 'all', '6', '12', '24', '36' (months)
+  
+  // Helper function to filter by date and sort by most recent
+  const filterByDate = (items, dateField) => {
+    let filtered = items;
+    
+    if (dateFilter !== 'all') {
+      const months = parseInt(dateFilter);
+      const cutoffDate = new Date();
+      cutoffDate.setMonth(cutoffDate.getMonth() - months);
+      
+      filtered = items.filter(item => {
+        // If item doesn't have the date field, include it (don't filter out external data)
+        if (!item[dateField]) return true;
+        
+        const itemDate = new Date(item[dateField]);
+        // Check if date is valid
+        if (isNaN(itemDate.getTime())) return true;
+        
+        return itemDate >= cutoffDate;
+      });
+    }
+    
+    // Sort by date - most recent first
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a[dateField]);
+      const dateB = new Date(b[dateField]);
+      
+      // Items without dates go to the end
+      if (isNaN(dateA.getTime())) return 1;
+      if (isNaN(dateB.getTime())) return -1;
+      
+      // Most recent first (descending order)
+      return dateB - dateA;
+    });
+  };
   
   // Data for different sections
   const [researchers, setResearchers] = useState([]);
@@ -53,7 +99,17 @@ export default function PatientDashboard() {
   const [favorites, setFavorites] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
   const [notifications, setNotifications] = useState([]);
+  
+  // Pagination states
+  const [researchersPage, setResearchersPage] = useState(1);
+  const [trialsPage, setTrialsPage] = useState(1);
+  const [publicationsPage, setPublicationsPage] = useState(1);
+  const ITEMS_PER_PAGE = 12;
   const [unreadCount, setUnreadCount] = useState(0);
+  
+  // Researcher Profile Modal
+  const [selectedResearcher, setSelectedResearcher] = useState(null);
+  const [showResearcherModal, setShowResearcherModal] = useState(false);
 
   useEffect(() => {
     fetchUserData();
@@ -92,6 +148,28 @@ export default function PatientDashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection, user]);
+
+  // Refetch when source or date filters change
+  useEffect(() => {
+    if (user && (activeSection === 'researchers' || activeSection === 'experts')) {
+      console.log('🔄 Refetching researchers due to filter change:', { researcherSource, dateFilter });
+      fetchResearchers();
+    }
+  }, [researcherSource, dateFilter, searchQuery, locationFilter, user, activeSection]);
+
+  useEffect(() => {
+    if (user && activeSection === 'publications') {
+      console.log('🔄 Refetching publications due to filter change:', { publicationSource, dateFilter });
+      fetchPublications();
+    }
+  }, [publicationSource, dateFilter, searchQuery, user, activeSection]);
+
+  useEffect(() => {
+    if (user && activeSection === 'trials') {
+      console.log('🔄 Refetching trials due to filter change:', { trialSource, dateFilter, statusFilter, phaseFilter });
+      fetchTrials();
+    }
+  }, [trialSource, dateFilter, statusFilter, phaseFilter, user, activeSection]);
 
   const fetchUserData = async () => {
     try {
@@ -197,9 +275,9 @@ export default function PatientDashboard() {
     const condition = conditionFilters[0] || searchQuery || 'cancer';
     
     const [pubsRes, trialsRes, researchersRes] = await Promise.all([
-      fetch(`/api/publications?condition=${encodeURIComponent(condition)}&limit=6`),
-      fetch(`/api/clinical-trials?condition=${encodeURIComponent(condition)}&limit=6`),
-      fetch(`/api/researchers?condition=${encodeURIComponent(condition)}&limit=6`)
+      fetch(`/api/publications?condition=${encodeURIComponent(condition)}&limit=12`),
+      fetch(`/api/clinical-trials?condition=${encodeURIComponent(condition)}&limit=12`),
+      fetch(`/api/researchers?condition=${encodeURIComponent(condition)}&limit=12`)
     ]);
 
     const pubs = await pubsRes.json();
@@ -238,13 +316,47 @@ export default function PatientDashboard() {
         url += `&location=${encodeURIComponent(locationFilter)}`;
       }
 
+      // Add source filter
+      if (researcherSource && researcherSource !== 'all') {
+        url += `&source=${researcherSource}`;
+      }
+
       console.log('Fetching researchers with URL:', url);
       console.log('Search query:', searchQuery);
       console.log('Condition filters:', conditionFilters);
+      console.log('Source filter:', researcherSource);
       const response = await fetch(url);
       const data = await response.json();
       console.log('Researchers found:', data.researchers?.length || 0);
-      setResearchers(data.researchers || []);
+      
+      // Apply date filter and sorting
+      let filteredResearchers = data.researchers || [];
+      
+      if (dateFilter !== 'all') {
+        // For internal researchers, filter by date
+        // For external researchers, keep them all but sort by any available date
+        filteredResearchers = filteredResearchers.filter(r => {
+          if (r.isInternalResearcher && r.updatedAt) {
+            const months = parseInt(dateFilter);
+            const cutoffDate = new Date();
+            cutoffDate.setMonth(cutoffDate.getMonth() - months);
+            const itemDate = new Date(r.updatedAt);
+            return itemDate >= cutoffDate;
+          }
+          return true; // Keep all external researchers
+        });
+      }
+      
+      // Sort by date - most recent first
+      filteredResearchers.sort((a, b) => {
+        const dateA = new Date(a.updatedAt || a.createdAt || 0);
+        const dateB = new Date(b.updatedAt || b.createdAt || 0);
+        return dateB - dateA;
+      });
+      
+      console.log('After date filter:', filteredResearchers.length);
+      
+      setResearchers(filteredResearchers);
     } catch (error) {
       console.error('Error fetching researchers:', error);
       setResearchers([]);
@@ -253,7 +365,7 @@ export default function PatientDashboard() {
 
   const fetchTrials = async () => {
     try {
-      let url = '/api/clinical-trials?limit=20';
+      let url = '/api/clinical-trials?limit=50';
       
       // Add condition filters
       if (conditionFilters.length > 0) {
@@ -280,13 +392,63 @@ export default function PatientDashboard() {
         url += `&status=${encodeURIComponent(statusFilter)}`;
       }
 
-      console.log('Fetching trials with URL:', url);
+      // Add source filter
+      if (trialSource && trialSource !== 'all') {
+        url += `&source=${trialSource}`;
+      }
+
+      console.log('🔍 Fetching trials with URL:', url);
+      console.log('📊 Filters:', { 
+        source: trialSource, 
+        dateFilter, 
+        status: statusFilter, 
+        phase: phaseFilter,
+        location: locationFilter 
+      });
+      
       const response = await fetch(url);
       const data = await response.json();
-      setTrials(data.trials || []);
       
-      // Show message if no results with filters applied
-      if (data.message && data.trials?.length === 0) {
+      console.log('📥 API Response:', {
+        trialsCount: data.trials?.length || 0,
+        cached: data.cached,
+        message: data.message
+      });
+      
+      // Apply date filter and sort - trials have startDate
+      let filteredTrials = data.trials || [];
+      
+      console.log('📅 Date filter value:', dateFilter);
+      console.log('📊 Trials before date filter:', filteredTrials.length);
+      
+      if (dateFilter !== 'all') {
+        const months = parseInt(dateFilter);
+        const cutoffDate = new Date();
+        cutoffDate.setMonth(cutoffDate.getMonth() - months);
+        
+        console.log('🔍 Applying date filter:', { months, cutoffDate });
+        
+        filteredTrials = filteredTrials.filter(trial => {
+          if (!trial.startDate) return true; // Keep if no date
+          const trialDate = new Date(trial.startDate);
+          if (isNaN(trialDate.getTime())) return true; // Keep if invalid date
+          return trialDate >= cutoffDate;
+        });
+      }
+      
+      // Sort by start date - most recent first
+      filteredTrials.sort((a, b) => {
+        const dateA = new Date(a.startDate || 0);
+        const dateB = new Date(b.startDate || 0);
+        return dateB - dateA;
+      });
+      
+      console.log('✅ Trials after date filter:', filteredTrials.length);
+      
+      setTrials(filteredTrials);
+      
+      // Log message if provided by API (removed toast to avoid spam)
+      if (data.message) {
         console.log('ℹ️', data.message);
       }
     } catch (error) {
@@ -314,11 +476,43 @@ export default function PatientDashboard() {
         url += `&condition=cancer`;
       }
 
+      // Add source filter
+      if (publicationSource && publicationSource !== 'all') {
+        url += `&source=${publicationSource}`;
+      }
+
       console.log('Publications API URL:', url);
+      console.log('Source filter:', publicationSource);
       const response = await fetch(url);
       const data = await response.json();
       console.log('Publications response:', data.publications?.length || 0, 'results');
-      setPublications(data.publications || []);
+      
+      // Apply date filter and sort - publications have publishedDate
+      let filteredPublications = data.publications || [];
+      
+      if (dateFilter !== 'all') {
+        const months = parseInt(dateFilter);
+        const cutoffDate = new Date();
+        cutoffDate.setMonth(cutoffDate.getMonth() - months);
+        
+        filteredPublications = filteredPublications.filter(pub => {
+          if (!pub.publishedDate) return true; // Keep if no date
+          const pubDate = new Date(pub.publishedDate);
+          if (isNaN(pubDate.getTime())) return true; // Keep if invalid date
+          return pubDate >= cutoffDate;
+        });
+      }
+      
+      // Sort by published date - most recent first
+      filteredPublications.sort((a, b) => {
+        const dateA = new Date(a.publishedDate || 0);
+        const dateB = new Date(b.publishedDate || 0);
+        return dateB - dateA;
+      });
+      
+      console.log('Publications after date filter:', filteredPublications.length);
+      
+      setPublications(filteredPublications);
     } catch (error) {
       console.error('Error fetching publications:', error);
       setPublications([]);
@@ -413,21 +607,39 @@ export default function PatientDashboard() {
         onSectionChange={setActiveSection}
         user={user}
         onLogout={handleLogout}
-        unreadCount={unreadCount}
       />
+
+      {/* Notification Bell */}
+      <NotificationBell user={user} />
 
       {/* Cura AI Assistant */}
       <CuraAI />
 
-      {/* Main Content - responsive padding for hamburger menu */}
-      <main className="pr-4 sm:pr-20 pl-4 sm:pl-8 py-4 sm:py-8">
-        {/* Header */}
+      {/* Researcher Profile Modal */}
+      <ResearcherProfileModal
+        researcher={selectedResearcher}
+        isOpen={showResearcherModal}
+        onClose={() => {
+          setShowResearcherModal(false);
+          setSelectedResearcher(null);
+        }}
+        onConnect={(researcherId) => {
+          toast.success({ title: 'Connection Request Sent', description: 'The researcher will be notified' });
+        }}
+        onFollow={(researcherId) => {
+          toast.success({ title: 'Following', description: 'You are now following this researcher' });
+        }}
+      />
+
+      {/* Main Content - fixed header at top */}
+      <main className="px-4 sm:px-6 md:px-8 pt-4 pb-6 sm:pb-8">
+        {/* Header - Fixed at top */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 sm:mb-8"
+          className="mb-4 sm:mb-6"
         >
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-2">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-1">
             {getSectionTitle()}
           </h1>
           <p className="text-sm sm:text-base text-gray-600">{getSectionDescription()}</p>
@@ -453,7 +665,7 @@ export default function PatientDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="mb-4 sm:mb-6 space-y-4"
+          className="mb-3 sm:mb-4 space-y-3"
         >
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
@@ -530,6 +742,135 @@ export default function PatientDashboard() {
               Apply
             </Button>
           </div>
+
+          {/* Filters for Researchers */}
+          {(activeSection === 'researchers' || activeSection === 'experts') && (
+            <div className="flex items-center gap-4 flex-wrap mb-4">
+              {/* Source Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Filter className="w-4 h-4" />
+                  Source:
+                </label>
+                <select
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={researcherSource}
+                  onChange={(e) => setResearcherSource(e.target.value)}
+                >
+                  <option value="all">All Sources</option>
+                  <option value="internal">Curalink Only</option>
+                  <option value="pubmed">PubMed Only</option>
+                  <option value="scholar">Google Scholar Only</option>
+                  <option value="orcid">ORCID Only</option>
+                </select>
+              </div>
+              
+              {/* Date Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Updated:
+                </label>
+                <select
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                >
+                  <option value="all">All Time</option>
+                  <option value="6">Last 6 Months</option>
+                  <option value="12">Last 1 Year</option>
+                  <option value="24">Last 2 Years</option>
+                  <option value="36">Last 3 Years</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Filters for Publications */}
+          {activeSection === 'publications' && (
+            <div className="flex items-center gap-4 flex-wrap mb-4">
+              {/* Source Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Filter className="w-4 h-4" />
+                  Source:
+                </label>
+                <select
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={publicationSource}
+                  onChange={(e) => setPublicationSource(e.target.value)}
+                >
+                  <option value="all">All Sources</option>
+                  <option value="internal">Curalink Only</option>
+                  <option value="pubmed">PubMed Only</option>
+                  <option value="orcid">ORCID Only</option>
+                  <option value="arxiv">arXiv Only</option>
+                </select>
+              </div>
+              
+              {/* Date Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Published:
+                </label>
+                <select
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                >
+                  <option value="all">All Time</option>
+                  <option value="6">Last 6 Months</option>
+                  <option value="12">Last 1 Year</option>
+                  <option value="24">Last 2 Years</option>
+                  <option value="36">Last 3 Years</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Filters for Clinical Trials */}
+          {activeSection === 'trials' && (
+            <div className="flex items-center gap-4 flex-wrap mb-4">
+              {/* Source Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Filter className="w-4 h-4" />
+                  Source:
+                </label>
+                <select
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={trialSource}
+                  onChange={(e) => setTrialSource(e.target.value)}
+                >
+                  <option value="all">All Sources</option>
+                  <option value="internal">Curalink Only</option>
+                  <option value="clinicaltrials">ClinicalTrials.gov</option>
+                  <option value="pubmed">PubMed</option>
+                  <option value="arxiv">arXiv</option>
+                </select>
+              </div>
+              
+              {/* Date Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Started:
+                </label>
+                <select
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                >
+                  <option value="all">All Time</option>
+                  <option value="6">Last 6 Months</option>
+                  <option value="12">Last 1 Year</option>
+                  <option value="24">Last 2 Years</option>
+                  <option value="36">Last 3 Years</option>
+                </select>
+              </div>
+            </div>
+          )}
 
           {/* Condition Filters */}
           <div className="flex items-center gap-2 flex-wrap">
@@ -618,18 +959,28 @@ export default function PatientDashboard() {
             {activeSection === 'dashboard' && dashboardData && (
               <DashboardContent 
                 data={dashboardData} 
-                onSectionChange={setActiveSection} 
+                onSectionChange={setActiveSection}
+                onViewProfile={(researcher) => {
+                  setSelectedResearcher(researcher);
+                  setShowResearcherModal(true);
+                }}
               />
             )}
 
             {/* Experts Section */}
             {activeSection === 'experts' && (
-              <ResearchersContent researchers={researchers} onRefresh={fetchResearchers} />
+              <ResearchersContent researchers={researchers} onRefresh={fetchResearchers} onViewProfile={(researcher) => {
+                setSelectedResearcher(researcher);
+                setShowResearcherModal(true);
+              }} />
             )}
 
             {/* Researchers Section */}
             {activeSection === 'researchers' && (
-              <ResearchersContent researchers={researchers} onRefresh={fetchResearchers} />
+              <ResearchersContent researchers={researchers} onRefresh={fetchResearchers} onViewProfile={(researcher) => {
+                setSelectedResearcher(researcher);
+                setShowResearcherModal(true);
+              }} />
             )}
 
             {/* Trials Section */}
@@ -673,7 +1024,7 @@ export default function PatientDashboard() {
 }
 
 // Dashboard Content Component
-function DashboardContent({ data, onSectionChange }) {
+function DashboardContent({ data, onSectionChange, onViewProfile }) {
   return (
     <div className="space-y-8">
       {/* Find Experts CTA */}
@@ -712,7 +1063,7 @@ function DashboardContent({ data, onSectionChange }) {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {data.researchers?.slice(0, 3).map((researcher) => (
-            <ResearcherCard key={researcher.id} researcher={researcher} />
+            <ResearcherCard key={researcher.id} researcher={researcher} onViewProfile={onViewProfile} />
           ))}
         </div>
         {(!data.researchers || data.researchers.length === 0) && (
@@ -776,11 +1127,11 @@ function DashboardContent({ data, onSectionChange }) {
 
 // Expert Card Component
 // Researcher Card Component
-function ResearcherCard({ researcher, onFavoriteChange }) {
+function ResearcherCard({ researcher, onFavoriteChange, onViewProfile }) {
+  const toast = useToast();
   const [isFollowing, setIsFollowing] = useState(false);
   const [isNudging, setIsNudging] = useState(false);
   const [showMeetingModal, setShowMeetingModal] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
 
   // Check if already favorited on mount
@@ -884,9 +1235,12 @@ function ResearcherCard({ researcher, onFavoriteChange }) {
         })
       });
       if (response.ok) {
-        alert('Invitation sent! The researcher will be notified.');
+        toast.success({ title: 'Invitation Sent!', description: 'The researcher will be notified.' });
+      } else {
+        toast.error({ title: 'Failed', description: 'Could not send invitation.' });
       }
     } catch (error) {
+      toast.error({ title: 'Error', description: 'Failed to send invitation.' });
       console.error('Nudge error:', error);
     }
     setIsNudging(false);
@@ -906,10 +1260,13 @@ function ResearcherCard({ researcher, onFavoriteChange }) {
         })
       });
       if (response.ok) {
-        alert('Meeting request sent! You will be notified when the researcher responds.');
+        toast.success({ title: 'Meeting Request Sent!', description: 'You will be notified when the researcher responds.' });
         setShowMeetingModal(false);
+      } else {
+        toast.error({ title: 'Failed', description: 'Could not send meeting request.' });
       }
     } catch (error) {
+      toast.error({ title: 'Error', description: 'Failed to send meeting request.' });
       console.error('Meeting request error:', error);
     }
   };
@@ -984,7 +1341,7 @@ function ResearcherCard({ researcher, onFavoriteChange }) {
           <Button 
             size="sm" 
             variant="outline"
-            onClick={() => setShowProfileModal(true)}
+            onClick={() => onViewProfile?.(researcher)}
           >
             <Eye className="w-4 h-4 mr-1" />
             View Profile
@@ -1016,46 +1373,10 @@ function ResearcherCard({ researcher, onFavoriteChange }) {
         </div>
       </Card>
 
-      {/* Profile Modal */}
-      {showProfileModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start mb-4">
-              <h2 className="text-2xl font-bold">{researcher.name}</h2>
-              <button onClick={() => setShowProfileModal(false)} className="text-gray-500 hover:text-gray-700">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold mb-2">Affiliation</h3>
-                <p className="text-gray-600">{researcher.affiliation}</p>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Specialization</h3>
-                <p className="text-gray-600">{researcher.specialization}</p>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Location</h3>
-                <p className="text-gray-600">{researcher.location}</p>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Publications ({researcher.publicationCount})</h3>
-                <ul className="list-disc list-inside space-y-1">
-                  {researcher.publications?.slice(0, 5).map((pub, idx) => (
-                    <li key={idx} className="text-sm text-gray-600">{pub}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Meeting Request Modal */}
       {showMeetingModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-black bg-opacity-30 z-[60] flex items-center justify-center p-4" onClick={() => setShowMeetingModal(false)}>
+          <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-start mb-4">
               <h2 className="text-xl font-bold">Request Meeting</h2>
               <button onClick={() => setShowMeetingModal(false)} className="text-gray-500 hover:text-gray-700">
@@ -1209,15 +1530,15 @@ function TrialCard({ trial, onFavoriteChange }) {
       const data = await response.json();
 
       if (response.ok) {
-        alert('✅ Your inquiry has been sent successfully! The trial administrator will contact you soon.');
+        toast.success({ title: 'Inquiry Sent!', description: 'The trial administrator will contact you soon.' });
         setShowEmailModal(false);
         setEmailForm({ subject: '', message: '' });
       } else {
-        alert('❌ Failed to send inquiry: ' + (data.error || 'Unknown error'));
+        toast.error({ title: 'Failed', description: data.error || 'Could not send inquiry.' });
       }
     } catch (error) {
       console.error('Error sending inquiry:', error);
-      alert('❌ Failed to send inquiry. Please try again.');
+      toast.error({ title: 'Error', description: 'Failed to send inquiry. Please try again.' });
     } finally {
       setSending(false);
     }
@@ -1268,10 +1589,10 @@ function TrialCard({ trial, onFavoriteChange }) {
           {trial.phase && (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">
-                {trial.phase}
+                {trial.phase.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </span>
               <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                {trial.status || 'Active'}
+                {(trial.status || 'Active').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </span>
               {trial.isInternalTrial && (
                 <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">
@@ -1304,8 +1625,8 @@ function TrialCard({ trial, onFavoriteChange }) {
 
       {/* Email Compose Modal */}
       {showEmailModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-20 z-50 flex items-center justify-center p-4" onClick={() => setShowEmailModal(false)}>
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-2xl font-bold text-gray-800">Contact Trial Administrator</h2>
               <button onClick={() => setShowEmailModal(false)} className="text-gray-500 hover:text-gray-700">
@@ -1527,30 +1848,48 @@ function PublicationCard({ publication, onFavoriteChange }) {
 }
 
 // Content Components
-function ResearchersContent({ researchers, onRefresh }) {
+function ResearchersContent({ researchers, onRefresh, onViewProfile }) {
+  const [displayCount, setDisplayCount] = useState(12);
+  const displayedResearchers = researchers.slice(0, displayCount);
+  const hasMore = displayCount < researchers.length;
+  
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {researchers.map((researcher) => (
-        <ResearcherCard key={researcher.id} researcher={researcher} onFavoriteChange={onRefresh} />
-      ))}
-      {researchers.length === 0 && (
-        <div className="col-span-full text-center py-12">
-          <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">No researchers found for the selected condition. Try a different condition.</p>
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {displayedResearchers.map((researcher) => (
+          <ResearcherCard key={researcher.id} researcher={researcher} onFavoriteChange={onRefresh} onViewProfile={onViewProfile} />
+        ))}
+        {researchers.length === 0 && (
+          <div className="col-span-full text-center py-12">
+            <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">No researchers found for the selected condition. Try a different condition.</p>
+          </div>
+        )}
+      </div>
+      {hasMore && (
+        <div className="text-center mt-6">
+          <Button onClick={() => setDisplayCount(prev => prev + 12)} variant="outline">
+            Load More ({researchers.length - displayCount} remaining)
+          </Button>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
 
 function TrialsContent({ trials, onRefresh, phaseFilter, statusFilter }) {
+  const [displayCount, setDisplayCount] = useState(12);
+  const displayedTrials = trials.slice(0, displayCount);
+  const hasMore = displayCount < trials.length;
+  
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {trials.map((trial, idx) => (
-        <TrialCard key={trial.id || `trial-${idx}-${trial.title}`} trial={trial} onFavoriteChange={onRefresh} />
-      ))}
-      {trials.length === 0 && (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {displayedTrials.map((trial, idx) => (
+          <TrialCard key={trial.id || `trial-${idx}-${trial.title}`} trial={trial} onFavoriteChange={onRefresh} />
+        ))}
+        {trials.length === 0 && (
         <div className="col-span-full text-center py-12">
           <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-500">
@@ -1561,23 +1900,44 @@ function TrialsContent({ trials, onRefresh, phaseFilter, statusFilter }) {
         </div>
       )}
     </div>
+    {hasMore && (
+      <div className="text-center mt-6">
+        <Button onClick={() => setDisplayCount(prev => prev + 12)} variant="outline">
+          Load More ({trials.length - displayCount} remaining)
+        </Button>
+      </div>
+    )}
+    </>
   );
 }
 
 function PublicationsContent({ publications, onRefresh }) {
+  const [displayCount, setDisplayCount] = useState(12);
+  const displayedPublications = publications.slice(0, displayCount);
+  const hasMore = displayCount < publications.length;
+  
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {publications.map((pub, idx) => (
-        <PublicationCard key={pub.id || `pub-${idx}-${pub.title?.substring(0, 20)}`} publication={pub} onFavoriteChange={onRefresh} />
-      ))}
-      {publications.length === 0 && (
-        <div className="col-span-full text-center py-12">
-          <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">No publications found for the selected condition.</p>
-          <p className="text-gray-400 text-sm mt-2">Try selecting a different condition or check back later.</p>
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {displayedPublications.map((pub, idx) => (
+          <PublicationCard key={pub.id || `pub-${idx}-${pub.title?.substring(0, 20)}`} publication={pub} onFavoriteChange={onRefresh} />
+        ))}
+        {publications.length === 0 && (
+          <div className="col-span-full text-center py-12">
+            <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">No publications found for the selected condition.</p>
+            <p className="text-gray-400 text-sm mt-2">Try selecting a different condition or check back later.</p>
+          </div>
+        )}
+      </div>
+      {hasMore && (
+        <div className="text-center mt-6">
+          <Button onClick={() => setDisplayCount(prev => prev + 12)} variant="outline">
+            Load More ({publications.length - displayCount} remaining)
+          </Button>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -1611,7 +1971,7 @@ function ForumsContent({ forums, currentUser }) {
 
   const handleCreatePost = async () => {
     if (!newPost.title || !newPost.content) {
-      alert('Please fill in all fields');
+      toast.error({ title: 'Missing Fields', description: 'Please fill in all fields' });
       return;
     }
 
@@ -1623,15 +1983,15 @@ function ForumsContent({ forums, currentUser }) {
       });
 
       if (response.ok) {
-        alert('✅ Your question has been posted! Researchers will answer soon.');
+        toast.success({ title: 'Post Created!', description: 'Researchers will answer soon.' });
         setShowCreatePost(false);
         setNewPost({ title: '', content: '', category: 'general' });
-        window.location.reload();
+        fetchForums(); // Refresh forums instead of page reload
       } else {
-        alert('Failed to create post');
+        toast.error({ title: 'Failed', description: 'Could not create post' });
       }
     } catch (error) {
-      alert('Error creating post');
+      toast.error({ title: 'Error', description: 'Failed to create post' });
     }
   };
 
@@ -1648,13 +2008,13 @@ function ForumsContent({ forums, currentUser }) {
       });
 
       if (response.ok) {
-        alert('✅ Post deleted successfully');
-        window.location.reload();
+        toast.success({ title: 'Post Deleted', description: 'Post deleted successfully' });
+        fetchForums(); // Refresh forums instead of page reload
       } else {
-        alert('Failed to delete post');
+        toast.error({ title: 'Failed', description: 'Could not delete post' });
       }
     } catch (error) {
-      alert('Error deleting post');
+      toast.error({ title: 'Error', description: 'Failed to delete post' });
     }
   };
 
@@ -1679,8 +2039,8 @@ function ForumsContent({ forums, currentUser }) {
     <div className="space-y-6">
       {/* View Post Modal */}
       {selectedPost && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-20 z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={() => setSelectedPost(null)}>
+          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-200 flex justify-between items-start sticky top-0 bg-white">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
@@ -1919,6 +2279,10 @@ function ForumsContent({ forums, currentUser }) {
 }
 
 function FavoritesContent({ favorites, onRefresh }) {
+  const onViewProfile = (researcher) => {
+    alert(`Viewing profile of ${researcher.name}\n\nEmail: ${researcher.email || 'N/A'}\nInstitution: ${researcher.affiliation || researcher.institution || 'N/A'}\nPublications: ${researcher.publicationCount || 0}`);
+  };
+
   if (favorites.length === 0) {
     return (
       <Card className="p-12 text-center">
@@ -1974,7 +2338,7 @@ function FavoritesContent({ favorites, onRefresh }) {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {researchers.map((researcher) => (
-              <ResearcherCard key={researcher.id || researcher.researcherProfileId || `researcher-${researcher.name}`} researcher={researcher} onFavoriteChange={onRefresh} />
+              <ResearcherCard key={researcher.id || researcher.researcherProfileId || `researcher-${researcher.name}`} researcher={researcher} onFavoriteChange={onRefresh} onViewProfile={onViewProfile} />
             ))}
           </div>
         </div>
@@ -1995,6 +2359,61 @@ function ProfileContent({ user, onUpdate }) {
     emergencyContact: user.patientProfile?.emergencyContact || ''
   });
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState(user.avatar || '');
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error({ title: 'Invalid File Type', description: 'Only JPEG, PNG, GIF, and WebP images are allowed.' });
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error({ title: 'File Too Large', description: 'Maximum size is 5MB.' });
+      return;
+    }
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload file
+    setUploading(true);
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append('avatar', file);
+
+      const response = await fetch('/api/upload/avatar', {
+        method: 'POST',
+        body: uploadFormData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setFormData({ ...formData, avatar: data.avatarUrl });
+        toast.success({ title: 'Avatar Uploaded', description: 'Profile picture uploaded successfully' });
+      } else {
+        const error = await response.json();
+        toast.error({ title: 'Upload Failed', description: error.error || 'Failed to upload avatar' });
+        setAvatarPreview(formData.avatar);
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast.error({ title: 'Error', description: 'Failed to upload avatar' });
+      setAvatarPreview(formData.avatar);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -2017,15 +2436,15 @@ function ProfileContent({ user, onUpdate }) {
       });
 
       if (response.ok) {
-        alert('Profile updated successfully!');
+        toast.success({ title: 'Profile Updated', description: 'Your profile has been updated successfully' });
         setIsEditing(false);
         onUpdate();
       } else {
-        alert('Failed to update profile');
+        toast.error({ title: 'Update Failed', description: 'Could not update profile' });
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error updating profile');
+      toast.error({ title: 'Error', description: 'Failed to update profile' });
     } finally {
       setSaving(false);
     }
@@ -2069,30 +2488,39 @@ function ProfileContent({ user, onUpdate }) {
             {/* Avatar Section */}
             <div className="border-b pb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Profile Picture URL
+                Profile Picture
               </label>
-              <Input
-                type="url"
-                value={formData.avatar}
-                onChange={(e) => setFormData({ ...formData, avatar: e.target.value })}
-                placeholder="https://example.com/your-photo.jpg"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Enter the URL of your profile picture (e.g., from Imgur, Cloudinary, or any public image hosting)
-              </p>
-              {formData.avatar && (
-                <div className="mt-3">
-                  <p className="text-xs text-gray-500 mb-2">Preview:</p>
+              <div className="flex items-center gap-4">
+                {avatarPreview ? (
                   <img
-                    src={formData.avatar}
+                    src={avatarPreview}
                     alt="Avatar preview"
                     className="w-20 h-20 rounded-full object-cover border-2 border-blue-200"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                    }}
                   />
+                ) : (
+                  <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-2xl">
+                    {user.name?.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    id="avatar-upload"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="avatar-upload"
+                    className="inline-block px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 transition-colors"
+                  >
+                    {uploading ? 'Uploading...' : 'Choose Image'}
+                  </label>
+                  <p className="text-xs text-gray-500 mt-2">
+                    JPG, PNG, GIF or WebP. Max size 5MB.
+                  </p>
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">

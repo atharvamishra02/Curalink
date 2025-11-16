@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getResearchersByCondition } from '@/lib/pubmed';
+import { fetchResearchersFromGoogleScholar } from '@/lib/serpapi';
+import { fetchResearchersFromORCID } from '@/lib/orcid';
+import { cache } from '@/lib/redis';
 import prisma from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
 
@@ -76,7 +79,10 @@ export async function GET(request) {
     const condition = searchParams.get('condition');
     const search = searchParams.get('search'); // Name search query
     const limit = parseInt(searchParams.get('limit') || '30');
+    const page = parseInt(searchParams.get('page') || '1');
+    const offset = (page - 1) * limit;
     const userLocation = searchParams.get('location'); // User's location
+    const source = searchParams.get('source') || 'all'; // Source filter: 'all', 'internal', 'pubmed', 'scholar', 'orcid'
 
     if (!condition) {
       return NextResponse.json(
@@ -85,74 +91,130 @@ export async function GET(request) {
       );
     }
 
+    // Aggressive caching for speed
+    const cacheKey = `res:v2:${source}:${condition}:${search || 'none'}:${userLocation || 'none'}:${page}:${limit}`;
+    const cachedData = await cache.get(cacheKey);
+    
+    if (cachedData) {
+      console.log('💾 Cache hit - instant response');
+      return NextResponse.json({
+        ...cachedData,
+        cached: true
+      });
+    }
+
     // Get current user for connection status
     const currentUser = getUserFromToken(request);
 
-    console.log('Fetching researchers for:', condition);
+    console.log('🔍 Fetching researchers for:', condition);
+    console.log('📊 Source filter:', source);
     if (search) {
-      console.log('Name search query:', search);
+      console.log('🔎 Name search query:', search);
     }
     if (userLocation) {
-      console.log('User location:', userLocation);
+      console.log('📍 User location:', userLocation);
     }
     
-    // Get internal researchers from database first
+    // Get internal researchers from database (if source is 'all' or 'internal')
     let internalResearchers = [];
-    try {
-      // Build the where clause based on whether we have a name search
+    if (source === 'all' || source === 'internal') {
+      try {
+      // Build the where clause based on source and search parameters
       let whereClause;
 
-      if (search) {
-        // If searching by name, look in name, email, and researcher profile
-        whereClause = {
-          AND: [
-            { role: 'RESEARCHER' },
-            {
-              OR: [
-                {
-                  name: {
-                    contains: search,
-                    mode: 'insensitive'
-                  }
-                },
-                {
-                  email: {
-                    contains: search,
-                    mode: 'insensitive'
-                  }
-                },
-                {
-                  researcherProfile: {
-                    institution: {
+      if (source === 'internal') {
+        // When filtering by "Curalink Only", show ALL researchers regardless of condition
+        if (search) {
+          // If searching by name, filter by name/email/institution
+          whereClause = {
+            AND: [
+              { role: 'RESEARCHER' },
+              {
+                OR: [
+                  {
+                    name: {
                       contains: search,
                       mode: 'insensitive'
                     }
+                  },
+                  {
+                    email: {
+                      contains: search,
+                      mode: 'insensitive'
+                    }
+                  },
+                  {
+                    researcherProfile: {
+                      institution: {
+                        contains: search,
+                        mode: 'insensitive'
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          };
+        } else {
+          // No search query - show all researchers
+          whereClause = {
+            role: 'RESEARCHER'
+          };
+        }
+      } else {
+        // When source is 'all', filter by condition or search
+        if (search) {
+          // If searching by name, look in name, email, and researcher profile
+          whereClause = {
+            AND: [
+              { role: 'RESEARCHER' },
+              {
+                OR: [
+                  {
+                    name: {
+                      contains: search,
+                      mode: 'insensitive'
+                    }
+                  },
+                  {
+                    email: {
+                      contains: search,
+                      mode: 'insensitive'
+                    }
+                  },
+                  {
+                    researcherProfile: {
+                      institution: {
+                        contains: search,
+                        mode: 'insensitive'
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          };
+        } else {
+          // If no name search, use condition-based search
+          whereClause = {
+            role: 'RESEARCHER',
+            researcherProfile: {
+              OR: [
+                {
+                  specialties: {
+                    hasSome: [condition]
+                  }
+                },
+                {
+                  bio: {
+                    contains: condition,
+                    mode: 'insensitive'
                   }
                 }
               ]
             }
-          ]
-        };
-      } else {
-        // If no name search, use condition-based search
-        whereClause = {
-          role: 'RESEARCHER',
-          researcherProfile: {
-            OR: [
-              {
-                specialties: {
-                  hasSome: [condition]
-                }
-              },
-              {
-                bio: {
-                  contains: condition,
-                  mode: 'insensitive'
-                }
-              }
-            ]
-          }
-        };
+          };
+        }
       }
 
       console.log('Where clause:', JSON.stringify(whereClause, null, 2));
@@ -167,13 +229,14 @@ export async function GET(request) {
             }
           }
         },
-        take: 10 // Limit internal researchers
+        take: source === 'internal' ? 50 : 10 // Show more when filtering by Curalink only
       });
 
-      console.log('Internal researchers found:', internalResearchers.length);
-    } catch (dbError) {
-      console.error('Error fetching internal researchers:', dbError.message);
-      console.error('Full error:', dbError);
+        console.log('Internal researchers found:', internalResearchers.length);
+      } catch (dbError) {
+        console.error('Error fetching internal researchers:', dbError.message);
+        console.error('Full error:', dbError);
+      }
     }
 
     // Get connection statuses and follow status if user is logged in
@@ -231,14 +294,131 @@ export async function GET(request) {
       }
     }
 
-    // Get external researchers from PubMed (with error handling)
-    let externalResearchers = [];
-    try {
-      externalResearchers = await getResearchersByCondition(condition, limit);
-    } catch (pubmedError) {
-      console.error('Error fetching external researchers:', pubmedError.message);
-      // Continue with internal researchers only
+    // Fetch external researchers in parallel for maximum speed
+    const externalFetchPromises = [];
+    
+    // Fetch from PubMed if source is 'all' or 'pubmed'
+    if (source === 'all' || source === 'pubmed') {
+      externalFetchPromises.push(
+        getResearchersByCondition({ condition, limit })
+          .then(pubmedResearchers => {
+            // Normalize PubMed data
+            return pubmedResearchers.map(pub => ({
+          id: pub.id,
+          name: pub.authors || 'Unknown Author',
+          email: null,
+          affiliation: pub.journal || 'PubMed',
+          specialty: condition,
+          specialization: condition,
+          publicationCount: 1,
+          trialCount: 0,
+          publications: [pub.title],
+          clinicalTrials: [],
+          bio: pub.abstract?.substring(0, 200) + '...' || `Researcher published in ${pub.journal}`,
+          location: pub.journal,
+          avatar: null,
+          isInternalResearcher: false,
+          source: 'PubMed',
+          connectionStatus: null,
+          connectionId: null,
+          isSentByMe: false,
+          isReceivedByMe: false,
+          availableForMeetings: false,
+          meetingSchedule: null,
+          isFollowing: false,
+          updatedAt: pub.publishDate
+        }));
+          })
+          .catch(error => {
+            console.error('❌ PubMed error:', error.message);
+            return [];
+          })
+      );
     }
+    
+    // Fetch from Google Scholar if source is 'all' or 'scholar'
+    if (source === 'all' || source === 'scholar') {
+      const searchQuery = search || condition;
+      externalFetchPromises.push(
+        fetchResearchersFromGoogleScholar(searchQuery, limit)
+          .then(scholarResearchers => {
+            // Normalize Google Scholar data
+            return scholarResearchers.map(r => ({
+          ...r,
+          affiliation: r.affiliation || 'Google Scholar',
+          specialty: r.specialty || condition,
+          specialization: r.specialization || condition,
+          publicationCount: r.publicationCount || 0,
+          trialCount: 0,
+          publications: r.publications || [],
+          clinicalTrials: [],
+          bio: r.bio || `Researcher specializing in ${condition}`,
+          isInternalResearcher: false,
+          connectionStatus: null,
+          connectionId: null,
+          isSentByMe: false,
+          isReceivedByMe: false,
+          availableForMeetings: false,
+          meetingSchedule: null,
+          isFollowing: false
+        }));
+          })
+          .catch(error => {
+            console.error('❌ Scholar error:', error.message);
+            return [];
+          })
+      );
+    }
+    
+    // Fetch from ORCID if source is 'all' or 'orcid'
+    if (source === 'all' || source === 'orcid') {
+      const searchQuery = search || condition;
+      externalFetchPromises.push(
+        fetchResearchersFromORCID({ query: searchQuery, limit })
+          .then(orcidResearchers => {
+            // Normalize ORCID data
+            return orcidResearchers.map(r => ({
+          id: r.id,
+          orcidId: r.orcidId,
+          name: r.name,
+          email: null,
+          affiliation: r.institution || 'ORCID',
+          specialty: r.role || condition,
+          specialization: r.role || condition,
+          publicationCount: r.worksCount || 0,
+          trialCount: 0,
+          publications: [],
+          clinicalTrials: [],
+          bio: r.biography || `${r.role || 'Researcher'} at ${r.institution || 'ORCID'}. Specializes in ${condition}.`,
+          location: r.institution || 'ORCID',
+          avatar: null,
+          isInternalResearcher: false,
+          source: 'ORCID',
+          connectionStatus: null,
+          connectionId: null,
+          isSentByMe: false,
+          isReceivedByMe: false,
+          availableForMeetings: false,
+          meetingSchedule: null,
+          isFollowing: false,
+          updatedAt: null,
+          url: r.url
+        }));
+          })
+          .catch(error => {
+            console.error('❌ ORCID error:', error.message);
+            return [];
+          })
+      );
+    }
+
+    // Execute all external fetches in parallel for maximum speed
+    const externalResults = await Promise.allSettled(externalFetchPromises);
+    const externalResearchers = externalResults
+      .filter(result => result.status === 'fulfilled')
+      .flatMap(result => result.value);
+
+    console.log(`✅ Fetched ${externalResearchers.length} external researchers in parallel`);
 
     // Transform internal researchers to match external format
     const formattedInternalResearchers = internalResearchers.map(researcher => {
@@ -326,12 +506,34 @@ export async function GET(request) {
       });
     }
 
-    return NextResponse.json({ 
-      researchers: allResearchers.slice(0, limit),
-      count: allResearchers.length,
+    // Pagination
+    const totalCount = allResearchers.length;
+    const paginatedResearchers = allResearchers.slice(offset, offset + limit);
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasMore = page < totalPages;
+
+    const responseData = {
+      researchers: paginatedResearchers,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        hasMore
+      },
+      count: totalCount,
       internal: formattedInternalResearchers.length,
       external: externalResearchers.length,
       sortedByLocation: !!userLocation
+    };
+    
+    // Cache external-only results for 30 minutes
+    // Cache for 1 hour - researchers don't change frequently
+    await cache.set(cacheKey, responseData, 3600);
+    
+    return NextResponse.json({ 
+      ...responseData,
+      cached: false
     });
   } catch (error) {
     console.error('Error in researchers API:', error);

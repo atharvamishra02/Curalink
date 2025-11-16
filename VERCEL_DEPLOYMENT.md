@@ -1,149 +1,234 @@
-# Vercel Deployment Steps
+# Vercel Deployment Guide for Curalink
 
-## Prerequisites
-- GitHub account with your repository
-- Vercel account (sign up at vercel.com)
-- Neon PostgreSQL database
-- Upstash Redis database
+## 🚀 Quick Deploy
 
-## Step 1: Prepare Environment Variables
-
-You'll need these environment variables:
-```
-DATABASE_URL=postgresql://username:password@host/database
-JWT_SECRET=your-secret-key-here
-REDIS_URL=your-upstash-redis-url
-REDIS_TOKEN=your-upstash-redis-token
-```
-
-## Step 2: Deploy to Vercel
-
-### Option A: Using Vercel Dashboard (Recommended)
-
-1. Go to https://vercel.com
-2. Click "Add New Project"
-3. Import your GitHub repository
-4. Configure project:
-   - Framework Preset: **Next.js**
-   - Build Command: `npm run vercel-build` (auto-detected)
-   - Output Directory: `.next` (auto-detected)
-
-5. Add Environment Variables:
-   - Click "Environment Variables"
-   - Add each variable from your `.env` file
-   - Make sure to add them for all environments (Production, Preview, Development)
-
-6. Click "Deploy"
-
-### Option B: Using Vercel CLI
-
-1. Install Vercel CLI:
+### 1. Install Vercel CLI
 ```bash
-npm i -g vercel
+npm install -g vercel
 ```
 
-2. Login to Vercel:
+### 2. Login to Vercel
 ```bash
 vercel login
 ```
 
-3. Deploy:
-```bash
-vercel
-```
-
-4. Follow the prompts and add environment variables when asked
-
-5. For production deployment:
+### 3. Deploy
 ```bash
 vercel --prod
 ```
 
-## Step 3: Configure Environment Variables in Vercel
+## 📋 Pre-Deployment Checklist
 
-In Vercel Dashboard → Your Project → Settings → Environment Variables, add:
+### Required Environment Variables
 
-| Name | Value | Environment |
-|------|-------|-------------|
-| DATABASE_URL | Your Neon PostgreSQL URL | Production, Preview, Development |
-| JWT_SECRET | Your secret key | Production, Preview, Development |
-| REDIS_URL | Your Upstash Redis URL | Production, Preview, Development |
-| REDIS_TOKEN | Your Upstash Redis Token | Production, Preview, Development |
+Set these in Vercel Dashboard (Settings → Environment Variables):
 
-## Step 4: Verify Deployment
+#### Database
+- `DATABASE_URL` - PostgreSQL connection string (use Vercel Postgres or external)
 
-1. Once deployed, Vercel will provide a URL (e.g., `your-app.vercel.app`)
-2. Visit the URL and test:
-   - User registration
-   - Login
-   - Profile updates
-   - Admin dashboard (login as admin@gmail.com)
+#### Redis
+- `UPSTASH_REDIS_REST_URL` - Get from Upstash.com (free tier available)
+- `UPSTASH_REDIS_REST_TOKEN` - Get from Upstash.com
 
-## Step 5: Set Up Custom Domain (Optional)
+#### Authentication
+- `JWT_SECRET` - Random secure string (generate with: `openssl rand -base64 32`)
+- `NEXTAUTH_SECRET` - Random secure string
+- `NEXTAUTH_URL` - Your Vercel domain (e.g., https://curalink.vercel.app)
 
-1. Go to Project Settings → Domains
+#### AI (Optional but recommended)
+- `GEMINI_API_KEY` - Get from Google AI Studio
+
+#### External APIs (Optional)
+- `AACT_USERNAME` - For clinical trials data
+- `AACT_PASSWORD` - For clinical trials data
+- `SERPAPI_KEY` - For Google Scholar integration
+
+### Database Setup
+
+#### Option 1: Vercel Postgres (Recommended)
+```bash
+# In Vercel Dashboard
+1. Go to Storage tab
+2. Create Postgres Database
+3. Copy DATABASE_URL to environment variables
+```
+
+#### Option 2: External Database (Supabase, Railway, etc.)
+```bash
+# Use your external PostgreSQL URL
+DATABASE_URL="postgresql://user:pass@host:5432/db?sslmode=require"
+```
+
+### Redis Setup (Required for Caching)
+
+#### Use Upstash (Recommended for Vercel)
+```bash
+1. Go to upstash.com
+2. Create free Redis database
+3. Copy REST URL and Token
+4. Add to Vercel environment variables
+```
+
+## 🔧 Deployment Steps
+
+### Step 1: Prepare Database
+```bash
+# Run migrations
+npx prisma migrate deploy
+
+# Generate Prisma Client
+npx prisma generate
+```
+
+### Step 2: Configure Vercel
+
+Create `vercel.json` (already created):
+```json
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "functions": {
+    "app/api/**/*.js": {
+      "maxDuration": 30
+    }
+  }
+}
+```
+
+### Step 3: Deploy
+```bash
+# Deploy to production
+vercel --prod
+
+# Or link to existing project
+vercel link
+vercel --prod
+```
+
+## ⚙️ Post-Deployment
+
+### 1. Run Database Migrations
+```bash
+# In Vercel Dashboard → Settings → Environment Variables
+# Add: PRISMA_GENERATE_SKIP_AUTOINSTALL=true
+
+# Then run migrations via Vercel CLI
+vercel env pull .env.production
+npx prisma migrate deploy
+```
+
+### 2. Test the Deployment
+- Visit your Vercel URL
+- Test login/signup
+- Check API endpoints
+- Verify Redis caching
+
+### 3. Set up Custom Domain (Optional)
+```bash
+# In Vercel Dashboard
+1. Go to Settings → Domains
 2. Add your custom domain
-3. Update DNS records as instructed by Vercel
+3. Update NEXTAUTH_URL environment variable
+```
 
-## Troubleshooting
+## 🔍 Troubleshooting
 
-### Database Connection Issues
-- Verify DATABASE_URL is correct
-- Check if Neon database allows connections from Vercel IPs
-- Ensure database is not sleeping (Neon free tier)
+### Build Errors
 
-### Build Failures
-- Check build logs in Vercel dashboard
-- Ensure all environment variables are set
-- Verify `package.json` scripts are correct
+**Error: Prisma Client not generated**
+```bash
+# Add to package.json scripts
+"postinstall": "prisma generate"
+```
 
-### Prisma Issues
-- The `vercel-build` script automatically runs:
-  1. `prisma generate` - Generates Prisma Client
-  2. `prisma db push` - Syncs schema with database
-  3. `next build` - Builds Next.js app
+**Error: Database connection failed**
+```bash
+# Check DATABASE_URL format
+# Ensure SSL mode is enabled for production
+DATABASE_URL="postgresql://...?sslmode=require"
+```
 
-### Redis Issues
-- Verify REDIS_URL and REDIS_TOKEN are correct
-- Check Upstash Redis dashboard for connection status
+### Runtime Errors
 
-## Automatic Deployments
+**Error: Redis connection failed**
+```bash
+# Verify Upstash credentials
+# Check UPSTASH_REDIS_REST_URL and TOKEN
+```
 
-Once connected to GitHub:
-- Every push to `main` branch triggers a production deployment
-- Every pull request creates a preview deployment
-- You can disable auto-deployments in Project Settings
+**Error: API timeout**
+```bash
+# Increase function timeout in vercel.json
+"maxDuration": 30
+```
 
-## Monitoring
+## 📊 Performance Optimization
 
-- View deployment logs in Vercel dashboard
-- Check function logs for API routes
-- Monitor database queries in Neon dashboard
-- Monitor Redis usage in Upstash dashboard
+### Already Implemented ✅
+- Redis caching (1-hour cache)
+- Parallel API fetching
+- Optimized database queries
+- Pagination
+- Response compression
 
-## Create Admin User After Deployment
+### Vercel-Specific Optimizations
+- Edge Functions for static content
+- Image optimization with Next.js Image
+- Automatic CDN distribution
+- Serverless function caching
 
-After first deployment, create an admin user:
+## 🔐 Security Checklist
 
-1. In Vercel dashboard, go to your project
-2. Open the Functions tab
-3. Create a serverless function or use API route:
-   ```
-   POST /api/auth/register
-   {
-     "name": "Admin User",
-     "email": "admin@gmail.com",
-     "password": "admin234",
-     "role": "ADMIN"
-   }
-   ```
+- [ ] All environment variables set
+- [ ] JWT_SECRET is strong and unique
+- [ ] Database uses SSL connection
+- [ ] CORS configured properly
+- [ ] Rate limiting enabled (via Vercel)
+- [ ] No sensitive data in code
 
-Or manually update the database to set a user's role to `ADMIN`.
+## 📱 Monitoring
 
-## Support
+### Vercel Analytics
+```bash
+# Enable in Vercel Dashboard
+Settings → Analytics → Enable
+```
 
-If you encounter issues:
-1. Check Vercel deployment logs
-2. Check browser console for errors
-3. Verify all environment variables are set correctly
-4. Ensure database is accessible
+### Error Tracking
+- Vercel automatically tracks errors
+- View in Dashboard → Logs
+
+## 🎉 You're Ready!
+
+Your Curalink app is now deployed on Vercel with:
+- ✅ Serverless API routes
+- ✅ Redis caching for speed
+- ✅ PostgreSQL database
+- ✅ Automatic HTTPS
+- ✅ Global CDN
+- ✅ Auto-scaling
+
+### Access Your App
+```
+https://your-project.vercel.app
+```
+
+### Continuous Deployment
+- Push to main branch → Auto-deploy
+- Pull requests → Preview deployments
+- Rollback anytime in Vercel Dashboard
+
+## 🆘 Need Help?
+
+- Vercel Docs: https://vercel.com/docs
+- Prisma Docs: https://www.prisma.io/docs
+- Upstash Docs: https://docs.upstash.com
+
+---
+
+**Note**: WebSocket functionality has been replaced with polling for Vercel compatibility. For real-time WebSocket support, consider deploying the Socket.io server separately on Railway, Render, or DigitalOcean.

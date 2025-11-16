@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Menu, 
@@ -15,44 +15,13 @@ import {
   LogOut,
   ChevronRight,
   Home,
-  Bell,
   ArrowRightLeft,
   GraduationCap,
   Settings,
   Shield
-} from 'lucide-react';export default function HamburgerMenu({ activeSection, onSectionChange, user, onLogout, isResearcher = false, unreadCount: propUnreadCount }) {
+} from 'lucide-react';export default function HamburgerMenu({ activeSection, onSectionChange, user, onLogout, isResearcher = false }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(propUnreadCount || 0);
   const router = useRouter();
-
-  // Update unread count when prop changes
-  useEffect(() => {
-    if (propUnreadCount !== undefined) {
-      setUnreadCount(propUnreadCount);
-    }
-  }, [propUnreadCount]);
-
-  // Fetch unread notifications count (fallback if not provided via prop)
-  useEffect(() => {
-    const fetchUnreadCount = async () => {
-      try {
-        const response = await fetch('/api/notifications/unread-count');
-        if (response.ok) {
-          const data = await response.json();
-          setUnreadCount(data.count || 0);
-        }
-      } catch (error) {
-        console.error('Error fetching unread count:', error);
-      }
-    };
-
-    if (user && propUnreadCount === undefined) {
-      fetchUnreadCount();
-      // Refresh count every 30 seconds
-      const interval = setInterval(fetchUnreadCount, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [user, propUnreadCount]);
 
   const patientMenuItems = [
     {
@@ -66,13 +35,6 @@ import {
       name: 'Dashboard',
       icon: LayoutDashboard,
       description: 'Personalized recommendations'
-    },
-    {
-      id: 'notifications',
-      name: 'Notifications',
-      icon: Bell,
-      description: 'View your notifications',
-      badge: unreadCount
     },
     {
       id: 'experts',
@@ -156,23 +118,10 @@ import {
       description: 'Engage in discussions'
     },
     {
-      id: 'notifications',
-      name: 'Notifications',
-      icon: Bell,
-      description: 'Meeting requests & invites',
-      badge: unreadCount
-    },
-    {
       id: 'favorites',
       name: 'Favorites',
       icon: Heart,
       description: 'Saved items'
-    },
-    {
-      id: 'settings',
-      name: 'Settings',
-      icon: Settings,
-      description: 'Profile & preferences'
     }
   ];
 
@@ -198,30 +147,22 @@ import {
 
   return (
     <>
-      {/* Hamburger Button */}
+      {/* Hamburger Button - Rightmost */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-4 right-4 z-50 p-3 bg-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+        className="fixed top-4 right-4 z-50 p-2 bg-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
         aria-label="Menu"
       >
         {isOpen ? (
-          <X className="w-6 h-6 text-gray-700" />
+          <X className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
         ) : (
-          <Menu className="w-6 h-6 text-gray-700" />
+          <Menu className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
         )}
       </button>
 
-      {/* Overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
-
-      {/* Sidebar Menu */}
+      {/* Sidebar Menu - Responsive width */}
       <div
-        className={`fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 h-full w-full sm:w-80 max-w-sm bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -240,12 +181,23 @@ import {
             
             {user && (
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold text-lg">
-                  {user.name?.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-800">{user.name}</p>
-                  <p className="text-sm text-gray-600">{user.email}</p>
+                {user.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={user.name}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-blue-300"
+                  />
+                ) : (
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold text-lg border-2 border-blue-300">
+                    {user.name?.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-800 truncate">{user.name}</p>
+                  <p className="text-sm text-gray-600 truncate">{user.email}</p>
+                  <p className="text-xs text-blue-600 font-medium mt-0.5">
+                    {user.role === 'PATIENT' ? '👤 Patient' : user.role === 'RESEARCHER' ? '🔬 Researcher' : '👑 Admin'}
+                  </p>
                 </div>
               </div>
             )}
@@ -277,16 +229,9 @@ import {
                     </div>
                     
                     <div className="flex-1 text-left">
-                      <div className="flex items-center gap-2">
-                        <p className={`font-semibold ${isActive ? 'text-white' : 'text-gray-800'}`}>
-                          {item.name}
-                        </p>
-                        {item.badge > 0 && (
-                          <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-5 h-5 flex items-center justify-center px-1.5">
-                            {item.badge > 99 ? '99+' : item.badge}
-                          </span>
-                        )}
-                      </div>
+                      <p className={`font-semibold ${isActive ? 'text-white' : 'text-gray-800'}`}>
+                        {item.name}
+                      </p>
                       <p className={`text-xs ${
                         isActive ? 'text-blue-100' : 'text-gray-500'
                       }`}>

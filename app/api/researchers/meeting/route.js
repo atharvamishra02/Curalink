@@ -76,6 +76,7 @@ export async function POST(request) {
             title: 'New Meeting Request',
             message: `${patient?.name || 'A patient'} requested a meeting with you`,
             metadata: {
+              senderId: user.userId, // Add senderId for replies
               meetingRequestId: meetingRequest.id,
               requesterId: user.userId,
               requesterName: patient?.name,

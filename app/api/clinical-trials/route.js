@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { searchClinicalTrials } from '@/lib/clinicalTrials';
+import { searchClinicalTrials as searchAACT } from '@/lib/aact';
+import { searchPubMed } from '@/lib/pubmed';
+import { searchArXiv } from '@/lib/arxiv';
+import { searchResearchGate } from '@/lib/researchgate';
 import { cache } from '@/lib/redis';
 import prisma from '@/lib/prisma';
 
@@ -9,9 +13,20 @@ export async function GET(request) {
     const condition = searchParams.get('condition');
     const keyword = searchParams.get('keyword');
     const limit = parseInt(searchParams.get('limit')) || 20;
-    const location = searchParams.get('location');
+    const page = parseInt(searchParams.get('page')) || 1;
+    const offset = (page - 1) * limit;
+    let location = searchParams.get('location');
     const phase = searchParams.get('phase');
     const status = searchParams.get('status');
+    const source = searchParams.get('source'); // 'all', 'internal', 'clinicaltrials', 'pubmed', 'arxiv'
+
+    // Smart location parsing: Extract country from "City, Country" format
+    if (location && location.includes(',')) {
+      const parts = location.split(',').map(p => p.trim());
+      const originalLocation = location;
+      location = parts[parts.length - 1]; // Get the last part (country)
+      console.log(`📍 Location parsing: "${originalLocation}" → "${location}"`);
+    }
 
     // Need at least one search parameter
     if (!condition && !keyword) {
@@ -21,17 +36,23 @@ export async function GET(request) {
       );
     }
 
-    // Check cache first
+    // Check cache first - include ALL filter parameters in cache key
     const searchTerm = keyword || condition;
-    const cacheKey = `trials:${searchTerm}:${location || 'all'}:${phase || 'all'}:${status || 'all'}:${limit}`;
+    const cacheKey = `trials:${searchTerm}:${location || 'all'}:${phase || 'all'}:${status || 'all'}:${source || 'all'}:${page}:${limit}`;
+    console.log('🔑 Cache key:', cacheKey);
+    console.log('📄 Page:', page, 'Limit:', limit, 'Offset:', offset);
+    
     const cachedData = await cache.get(cacheKey);
     
     if (cachedData) {
+      console.log('💾 Returning cached trials:', cachedData.trials?.length || 0);
       return NextResponse.json({
-        trials: cachedData,
+        ...cachedData,
         cached: true,
       });
     }
+    
+    console.log('🆕 Fetching fresh trials data');
 
     // Build search query - if keyword is provided, search across more fields including researcher name
     const searchConditions = [];
@@ -65,26 +86,50 @@ export async function GET(request) {
     }
     
     if (condition) {
-      // Search by condition
-      searchConditions.push(
-        {
-          conditions: {
-            hasSome: [condition]
+      // Handle multiple conditions (comma-separated) or single condition
+      const conditions = condition.includes(',') ? condition.split(',').map(c => c.trim()) : [condition];
+      
+      // For each condition, add search criteria
+      conditions.forEach(cond => {
+        searchConditions.push(
+          {
+            conditions: {
+              hasSome: [cond]
+            }
+          },
+          {
+            title: {
+              contains: cond,
+              mode: 'insensitive'
+            }
+          },
+          {
+            description: {
+              contains: cond,
+              mode: 'insensitive'
+            }
           }
-        },
-        {
-          title: {
-            contains: condition,
-            mode: 'insensitive'
+        );
+      });
+      
+      // Also search for the full phrase (e.g., "lung cancer" as a whole)
+      if (conditions.length > 1) {
+        const fullPhrase = conditions.join(' ');
+        searchConditions.push(
+          {
+            title: {
+              contains: fullPhrase,
+              mode: 'insensitive'
+            }
+          },
+          {
+            description: {
+              contains: fullPhrase,
+              mode: 'insensitive'
+            }
           }
-        },
-        {
-          description: {
-            contains: condition,
-            mode: 'insensitive'
-          }
-        }
-      );
+        );
+      }
     }
 
     // Fetch internal trials from database
@@ -138,135 +183,294 @@ export async function GET(request) {
       internalTrialsQuery.where.AND = additionalFilters;
     }
 
-    const internalTrials = await prisma.clinicalTrial.findMany(internalTrialsQuery);
+    // Fetch internal trials only if source is 'all' or 'internal'
+    let formattedInternalTrials = [];
+    if (!source || source === 'all' || source === 'internal') {
+      // If source is 'internal' (Curalink Only), fetch ALL trials regardless of condition
+      const finalQuery = source === 'internal' 
+        ? {
+            include: internalTrialsQuery.include,
+            take: 50, // Show more when filtering by Curalink only
+            orderBy: { createdAt: 'desc' }
+          }
+        : internalTrialsQuery;
+      
+      const internalTrials = await prisma.clinicalTrial.findMany(finalQuery);
 
-    // Transform internal trials to match external format
-    const formattedInternalTrials = internalTrials.map(trial => ({
-      id: trial.id,
-      nctId: trial.nctId,
-      title: trial.title,
-      description: trial.description,
-      summary: trial.description,
-      status: trial.status,
-      phase: trial.phase,
-      location: trial.location,
-      conditions: trial.conditions,
-      startDate: trial.startDate,
-      completionDate: trial.completionDate,
-      leadSponsor: trial.researcher?.institution || 'Curalink Platform',
-      principalInvestigator: trial.researcher?.user?.name || 'Unknown Investigator',
-      source: 'APP',
-      isInternalTrial: true
-    }));
+      // Transform internal trials to match external format
+      formattedInternalTrials = internalTrials.map(trial => ({
+        id: trial.id,
+        nctId: trial.nctId,
+        title: trial.title,
+        description: trial.description,
+        summary: trial.description,
+        status: trial.status,
+        phase: trial.phase,
+        location: trial.location,
+        conditions: trial.conditions,
+        startDate: trial.startDate,
+        completionDate: trial.completionDate,
+        leadSponsor: trial.researcher?.institution || 'Curalink Platform',
+        principalInvestigator: trial.researcher?.user?.name || 'Unknown Investigator',
+        source: 'APP',
+        isInternalTrial: true
+      }));
+    }
 
-    // Fetch external trials from ClinicalTrials.gov (with error handling)
+    // Fetch external trials and research from various sources
     let externalTrials = [];
-    try {
-      // Only fetch external if we have a condition (external API doesn't support researcher name search)
-      if (condition) {
-        console.log('Fetching external trials for condition:', condition);
-        
-        // Note: We don't pass phase/status to external API to avoid 400 errors
-        // All filtering will be done client-side after fetching
-        externalTrials = await searchClinicalTrials({
-          condition,
-          limit: limit * 2, // Fetch more to account for filtering
-          location,
+    
+    // Fetch from PubMed if selected
+    if ((source === 'all' || source === 'pubmed') && searchTerm) {
+      try {
+        console.log('🔬 Fetching articles from PubMed...');
+        const pubmedArticles = await searchPubMed({
+          query: searchTerm,
+          limit: limit
         });
         
-        console.log('External trials fetched:', externalTrials.length);
+        // Transform PubMed articles to trial-like format
+        const normalizedArticles = pubmedArticles.map(article => {
+          // Create a better summary
+          const abstractPreview = article.abstract && article.abstract !== 'No abstract available'
+            ? (article.abstract.length > 300 ? article.abstract.substring(0, 300) + '...' : article.abstract)
+            : `Research article published in ${article.journal} by ${article.authors}. Related to ${searchTerm}.`;
+          
+          const summary = `Published in ${article.journal} (${article.publishDate}). ${abstractPreview}`;
+          
+          return {
+            id: article.id,
+            nctId: article.pmid,
+            title: article.title,
+            description: article.abstract,
+            summary,
+            status: 'COMPLETED', // Use standard status
+            phase: 'NOT_APPLICABLE', // Publications don't have phases
+            location: article.journal,
+            conditions: [searchTerm],
+            startDate: article.publishDate,
+            completionDate: article.publishDate,
+            leadSponsor: article.journal,
+            principalInvestigator: article.authors,
+            url: article.url,
+            doi: article.doi,
+            source: 'PubMed',
+            type: 'publication'
+          };
+        });
+        
+        externalTrials.push(...normalizedArticles);
+        console.log(`✅ Fetched ${pubmedArticles.length} articles from PubMed`);
+      } catch (pubmedError) {
+        console.error('❌ Error fetching from PubMed:', pubmedError.message);
       }
-    } catch (apiError) {
-      console.error('Error fetching external trials:', apiError.message);
-      // Continue with internal trials only
+    }
+    
+    // Fetch from arXiv if selected
+    if ((source === 'all' || source === 'arxiv') && searchTerm) {
+      try {
+        console.log('📄 Fetching preprints from arXiv...');
+        const arxivPapers = await searchArXiv({
+          query: searchTerm,
+          limit: limit
+        });
+        
+        // Transform arXiv papers to trial-like format
+        const normalizedPapers = arxivPapers.map(paper => {
+          // Create a better summary from abstract
+          const abstractPreview = paper.abstract.length > 300 
+            ? paper.abstract.substring(0, 300) + '...' 
+            : paper.abstract;
+          
+          const summary = `Research preprint by ${paper.authors}. ${abstractPreview}`;
+          
+          return {
+            id: paper.id,
+            nctId: paper.arxivId,
+            title: paper.title,
+            description: paper.abstract,
+            summary,
+            status: 'COMPLETED', // Use standard status
+            phase: 'NOT_APPLICABLE', // Preprints don't have phases
+            location: paper.categories || 'arXiv',
+            conditions: paper.categories ? paper.categories.split(', ').slice(0, 3) : [searchTerm],
+            startDate: paper.publishDate,
+            completionDate: paper.updatedDate,
+            leadSponsor: 'arXiv',
+            principalInvestigator: paper.authors,
+            url: paper.url,
+            pdfUrl: paper.pdfUrl,
+            source: 'arXiv',
+            type: 'preprint'
+          };
+        });
+        
+        externalTrials.push(...normalizedPapers);
+        console.log(`✅ Fetched ${arxivPapers.length} papers from arXiv`);
+      } catch (arxivError) {
+        console.error('❌ Error fetching from arXiv:', arxivError.message);
+      }
+    }
+    
+
+
+    
+    // Fetch from ClinicalTrials.gov
+    if ((!source || source === 'all' || source === 'clinicaltrials') && condition) {
+      // Convert comma-separated conditions to space-separated for better search
+      const searchCondition = condition.includes(',') 
+        ? condition.split(',').map(c => c.trim()).join(' ')
+        : condition;
+      
+      console.log(`🔍 Fetching trials from ClinicalTrials.gov for condition: ${searchCondition}`);
+      console.log(`� FiFlters - Status: ${status || 'all'}, Phase: ${phase || 'all'}, Location: ${location || 'all'}`);
+      
+      // Try ClinicalTrials.gov API first (more reliable)
+      try {
+        const apiTrials = await searchClinicalTrials({
+          condition: searchCondition,
+          status,
+          phase,
+          location,
+          limit: limit * 2,
+        });
+        externalTrials.push(...apiTrials);
+        console.log(`✅ Fetched ${apiTrials.length} trials from ClinicalTrials.gov API`);
+      } catch (apiError) {
+        console.error('❌ Error fetching from ClinicalTrials.gov API:', apiError.message);
+        
+        // Fallback to AACT database if API fails
+        try {
+          console.log('⚠️ Falling back to AACT database');
+          const aactTrials = await searchAACT({
+            condition: searchCondition,
+            status,
+            phase,
+            location,
+            limit: limit * 2,
+            offset: 0
+          });
+          externalTrials.push(...aactTrials);
+          console.log(`✅ Fetched ${aactTrials.length} trials from AACT database`);
+        } catch (aactError) {
+          console.error('❌ Error fetching from AACT database:', aactError.message);
+        }
+      }
+    }
+
+    // Fetch from ResearchGate if selected (currently not available)
+    if ((source === 'all' || source === 'researchgate') && searchTerm) {
+      try {
+        console.log('🔍 Fetching from ResearchGate...');
+        const rgResults = await searchResearchGate({
+          query: searchTerm,
+          limit: limit
+        });
+        externalTrials.push(...rgResults);
+        console.log(`✅ Fetched ${rgResults.length} results from ResearchGate`);
+      } catch (rgError) {
+        console.error('❌ Error fetching from ResearchGate:', rgError.message);
+      }
     }
 
     // Combine both lists - internal first, then external
     const allTrials = [...formattedInternalTrials, ...externalTrials];
     
-    console.log('Total trials before filtering:', allTrials.length, { internal: formattedInternalTrials.length, external: externalTrials.length });
+    console.log('Total trials fetched:', allTrials.length, { 
+      internal: formattedInternalTrials.length, 
+      external: externalTrials.length 
+    });
     
-    // Apply client-side filtering if filters are present
+    // Log source breakdown
+    const sourceBreakdown = {};
+    allTrials.forEach(trial => {
+      sourceBreakdown[trial.source] = (sourceBreakdown[trial.source] || 0) + 1;
+    });
+    console.log('📊 Source breakdown:', sourceBreakdown);
+    
+    // Apply client-side phase and status filtering (for external sources that don't support these filters)
     let filteredTrials = allTrials;
-    if (phase || status) {
-      filteredTrials = allTrials.filter(trial => {
-        let matchesPhase = true;
-        let matchesStatus = true;
+    
+    // Phase filtering
+    if (phase) {
+      filteredTrials = filteredTrials.filter(trial => {
+        if (!trial.phase) return false;
         
-        if (phase) {
-          if (trial.isInternalTrial) {
-            // Internal trials are already filtered by database
-            matchesPhase = true;
-          } else if (trial.phase) {
-            // Normalize phase formats for comparison
-            // External API returns: "PHASE 1", "Phase 1", "PHASE1", "Early Phase 1", "N/A"
-            // We need to match to our format: "PHASE_1", "EARLY_PHASE_1", "NOT_APPLICABLE"
-            
-            const trialPhaseNormalized = trial.phase
-              .toUpperCase()
-              .replace(/EARLY\s+PHASE\s+/, 'EARLY_PHASE_')
-              .replace(/PHASE\s+/, 'PHASE_')
-              .replace(/\s+/g, '_')
-              .replace(/N\/A|NOT\s*APPLICABLE/i, 'NOT_APPLICABLE');
-            
-            matchesPhase = trialPhaseNormalized === phase;
-          } else {
-            matchesPhase = false;
-          }
-        }
+        // Normalize phase for comparison
+        const trialPhase = trial.phase
+          .toUpperCase()
+          .replace(/EARLY\s+PHASE\s+/, 'EARLY_PHASE_')
+          .replace(/PHASE\s+/, 'PHASE_')
+          .replace(/\s+/g, '_')
+          .replace(/N\/A|NOT\s*APPLICABLE/i, 'NOT_APPLICABLE');
         
-        if (status) {
-          if (trial.isInternalTrial) {
-            // Internal trials are already filtered by database
-            matchesStatus = true;
-          } else if (trial.status) {
-            // Normalize status for comparison
-            const normalizedTrialStatus = trial.status
-              .toUpperCase()
-              .replace(/[,\s]+/g, '_')
-              .replace(/__+/g, '_'); // Replace multiple underscores with single
-            
-            const normalizedFilterStatus = status.toUpperCase();
-            
-            // Direct match
-            matchesStatus = normalizedTrialStatus === normalizedFilterStatus;
-            
-            // Handle special cases
-            if (!matchesStatus && status === 'ACTIVE') {
-              // ACTIVE should match "ACTIVE" and "ACTIVE_NOT_RECRUITING"
-              matchesStatus = normalizedTrialStatus === 'ACTIVE' || 
-                            normalizedTrialStatus === 'ACTIVE_NOT_RECRUITING' ||
-                            normalizedTrialStatus.startsWith('ACTIVE');
-            }
-          } else {
-            matchesStatus = false;
-          }
-        }
-        
-        return matchesPhase && matchesStatus;
+        return trialPhase === phase;
       });
       
-      console.log('Total trials after client-side filtering:', filteredTrials.length);
+      console.log(`Filtered by phase ${phase}:`, filteredTrials.length, 'trials');
+    }
+    
+    // Status filtering (for external sources)
+    if (status) {
+      filteredTrials = filteredTrials.filter(trial => {
+        if (!trial.status) return false;
+        
+        // Normalize status for comparison
+        const trialStatus = trial.status
+          .toUpperCase()
+          .replace(/\s+/g, '_')
+          .replace(/,/g, '');
+        
+        return trialStatus === status;
+      });
       
-      // Log filter summary for debugging
-      if (filteredTrials.length === 0 && allTrials.length > 0) {
-        console.log(`⚠️ No trials matched filters (phase: ${phase || 'any'}, status: ${status || 'any'}). Fetched ${allTrials.length} trials but none matched.`);
-      }
+      console.log(`Filtered by status ${status}:`, filteredTrials.length, 'trials');
     }
 
-    // Cache for 6 hours (clinical trials don't change frequently)
-    await cache.set(cacheKey, filteredTrials, 21600);
+    // Generate helpful message based on results and filters
+    let message = undefined;
+    if (filteredTrials.length === 0) {
+      if (source === 'pubmed') {
+        message = `No articles found in PubMed for "${searchTerm}". Try different keywords or "All Sources".`;
+      } else if (source === 'arxiv') {
+        message = `No preprints found in arXiv for "${searchTerm}". Try different keywords or "All Sources".`;
+      } else if (location) {
+        message = `No trials found in "${location}". Try a different location or remove the location filter.`;
+      } else {
+        message = `No results found for "${searchTerm}". Try different keywords or adjust your filters.`;
+      }
+    } else if (source === 'pubmed') {
+      message = `Showing ${filteredTrials.length} articles from PubMed.`;
+    } else if (source === 'arxiv') {
+      message = `Showing ${filteredTrials.length} preprints from arXiv.`;
+    }
 
-    return NextResponse.json({
-      trials: filteredTrials.slice(0, limit),
+    // Apply pagination
+    const paginatedTrials = filteredTrials.slice(offset, offset + limit);
+    const totalPages = Math.ceil(filteredTrials.length / limit);
+    
+    const responseData = {
+      trials: paginatedTrials,
       cached: false,
       internal: formattedInternalTrials.length,
       external: externalTrials.length,
-      filtered: filteredTrials.length,
-      message: filteredTrials.length === 0 && (phase || status) 
-        ? `No trials found matching the selected filters. Try adjusting your phase or status selection.`
-        : undefined
-    });
+      total: filteredTrials.length,
+      source: source || 'all',
+      message,
+      pagination: {
+        page,
+        limit,
+        offset,
+        totalCount: filteredTrials.length,
+        totalPages,
+        hasMore: page < totalPages
+      }
+    };
+
+    // Cache the complete response for 6 hours (clinical trials don't change frequently)
+    await cache.set(cacheKey, responseData, 21600);
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error('Clinical Trials API Error:', error);
     return NextResponse.json(

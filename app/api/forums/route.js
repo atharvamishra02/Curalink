@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
+import { cache } from '@/lib/redis';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const CACHE_TTL = 30; // 30 seconds cache for forums
 
 // Helper to get user from token
 function getUserFromToken(request) {
@@ -27,6 +29,16 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const categorySlug = searchParams.get('category');
     const limit = parseInt(searchParams.get('limit') || '20');
+
+    // Try cache first
+    const cacheKey = `forums:${categorySlug || 'all'}:${limit}`;
+    const cachedData = await cache.get(cacheKey);
+    
+    if (cachedData) {
+      return NextResponse.json(cachedData, {
+        headers: { 'X-Cache': 'HIT' }
+      });
+    }
 
     let where = {};
     
@@ -87,9 +99,16 @@ export async function GET(request) {
       createdAt: forum.createdAt
     }));
 
-    return NextResponse.json({
+    const responseData = {
       forums: formattedForums,
       count: formattedForums.length
+    };
+
+    // Cache for 30 seconds
+    await cache.set(cacheKey, responseData, CACHE_TTL);
+
+    return NextResponse.json(responseData, {
+      headers: { 'X-Cache': 'MISS' }
     });
 
   } catch (error) {
@@ -123,23 +142,35 @@ export async function POST(request) {
       );
     }
 
+    // Map category values to names
+    const categoryMap = {
+      'general': { name: 'General', description: 'General discussions' },
+      'research': { name: 'Research & Methodology', description: 'Research methods and approaches' },
+      'clinical-trials': { name: 'Clinical Trials', description: 'Clinical trial discussions' },
+      'publications': { name: 'Publications', description: 'Research publications and papers' },
+      'qa': { name: 'Questions & Answers', description: 'Ask and answer questions' },
+      'collaboration': { name: 'Collaboration', description: 'Collaboration opportunities' }
+    };
+
+    const categorySlug = category?.toLowerCase() || 'general';
+    const categoryInfo = categoryMap[categorySlug] || categoryMap['general'];
+
     // Find or create the category
-    let forumCategory = await prisma.forumCategory.findFirst({
-      where: { slug: category?.toLowerCase() || 'general' }
+    let forumCategory = await prisma.forumCategory.upsert({
+      where: { slug: categorySlug },
+      update: {},
+      create: {
+        name: categoryInfo.name,
+        slug: categorySlug,
+        description: categoryInfo.description
+      }
     });
 
-    // If category doesn't exist, use the 'general' category or create it
-    if (!forumCategory) {
-      forumCategory = await prisma.forumCategory.upsert({
-        where: { slug: 'general' },
-        update: {},
-        create: {
-          name: 'General',
-          slug: 'general',
-          description: 'General discussions'
-        }
-      });
-    }
+    console.log('📁 Using category:', {
+      slug: forumCategory.slug,
+      name: forumCategory.name,
+      requested: category
+    });
 
     const forum = await prisma.forumPost.create({
       data: {
@@ -160,15 +191,27 @@ export async function POST(request) {
       }
     });
 
+    // Invalidate cache for all forums and this category
+    await cache.del(`forums:all:20`);
+    await cache.del(`forums:all:50`);
+    await cache.del(`forums:${categorySlug}:20`);
+    await cache.del(`forums:${categorySlug}:50`);
+
     return NextResponse.json({
       success: true,
-      forum: {
+      post: {
         id: forum.id,
         title: forum.title,
         content: forum.content,
-        category: forum.category,
-        author: forum.author?.name,
-        authorRole: forum.author?.role,
+        category: forum.category?.slug || categorySlug,
+        author: {
+          id: forum.author?.id,
+          name: forum.author?.name || 'Anonymous',
+          role: forum.author?.role
+        },
+        commentCount: 0,
+        viewCount: 0,
+        isPinned: false,
         createdAt: forum.createdAt
       }
     });

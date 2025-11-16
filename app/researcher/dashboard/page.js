@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Users, 
@@ -31,9 +31,13 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import HamburgerMenu from '@/components/HamburgerMenu';
 import CuraAI from '@/components/CuraAI';
+import NotificationBell from '@/components/NotificationBell';
+import EnhancedForums from '@/components/EnhancedForums';
+import { useToast } from '@/components/ToastProvider';
 
 export default function ResearcherDashboard() {
   const router = useRouter();
+  const toast = useToast();
   const [user, setUser] = useState(null);
   const [activeSection, setActiveSection] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,6 +56,56 @@ export default function ResearcherDashboard() {
   const [forums, setForums] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
+  const [publicationSources, setPublicationSources] = useState(['pubmed', 'arxiv', 'orcid']);
+  const [researcherSource, setResearcherSource] = useState('all'); // 'all', 'internal', 'pubmed', 'scholar', 'orcid'
+  const [dateFilter, setDateFilter] = useState('all'); // 'all', '6', '12', '24', '36' (months)
+  
+  // Pagination states
+  const [publicationPage, setPublicationPage] = useState(1);
+  const [researcherPage, setResearcherPage] = useState(1);
+  const [expertPage, setExpertPage] = useState(1);
+  const [publicationPagination, setPublicationPagination] = useState(null);
+  const [researcherPagination, setResearcherPagination] = useState(null);
+  const [expertPagination, setExpertPagination] = useState(null);
+  
+  // Client-side cache for faster switching between sources
+  const [researcherCache, setResearcherCache] = useState({});
+  const [publicationCache, setPublicationCache] = useState({});
+  
+  // Helper function to filter by date and sort by most recent
+  const filterByDate = (items, dateField) => {
+    let filtered = items;
+    
+    if (dateFilter !== 'all') {
+      const months = parseInt(dateFilter);
+      const cutoffDate = new Date();
+      cutoffDate.setMonth(cutoffDate.getMonth() - months);
+      
+      filtered = items.filter(item => {
+        // If item doesn't have the date field, include it (don't filter out external data)
+        if (!item[dateField]) return true;
+        
+        const itemDate = new Date(item[dateField]);
+        // Check if date is valid
+        if (isNaN(itemDate.getTime())) return true;
+        
+        return itemDate >= cutoffDate;
+      });
+    }
+    
+    // Sort by date - most recent first
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a[dateField]);
+      const dateB = new Date(b[dateField]);
+      
+      // Items without dates go to the end
+      if (isNaN(dateA.getTime())) return 1;
+      if (isNaN(dateB.getTime())) return -1;
+      
+      // Most recent first (descending order)
+      return dateB - dateA;
+    });
+  };
   
   useEffect(() => {
     fetchUserData();
@@ -64,6 +118,84 @@ export default function ResearcherDashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection, user]);
+
+  // Memoized filtered publications for better performance
+  const filteredPublications = useMemo(() => {
+    return publications.filter(pub => {
+      if (!searchQuery) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        pub.title?.toLowerCase().includes(query) ||
+        pub.journal?.toLowerCase().includes(query) ||
+        pub.abstract?.toLowerCase().includes(query)
+      );
+    });
+  }, [publications, searchQuery]);
+
+  // Memoized filtered researchers for better performance
+  const filteredResearchers = useMemo(() => {
+    return researchers.filter(researcher => {
+      if (!searchQuery && !locationFilter) return true;
+      const query = searchQuery?.toLowerCase() || '';
+      const location = locationFilter?.toLowerCase() || '';
+      
+      const matchesQuery = !query || (
+        researcher.name?.toLowerCase().includes(query) ||
+        researcher.affiliation?.toLowerCase().includes(query) ||
+        researcher.specialization?.toLowerCase().includes(query)
+      );
+      
+      const matchesLocation = !location || (
+        researcher.location?.toLowerCase().includes(location)
+      );
+      
+      return matchesQuery && matchesLocation;
+    });
+  }, [researchers, searchQuery, locationFilter]);
+
+  // Memoized filtered experts for better performance
+  const filteredExperts = useMemo(() => {
+    return experts.filter(expert => {
+      if (!searchQuery && !locationFilter) return true;
+      const query = searchQuery?.toLowerCase() || '';
+      const location = locationFilter?.toLowerCase() || '';
+      
+      const matchesQuery = !query || (
+        expert.name?.toLowerCase().includes(query) ||
+        expert.affiliation?.toLowerCase().includes(query) ||
+        expert.specialization?.toLowerCase().includes(query) ||
+        expert.specialty?.toLowerCase().includes(query)
+      );
+      
+      const matchesLocation = !location || (
+        expert.location?.toLowerCase().includes(location)
+      );
+      
+      return matchesQuery && matchesLocation;
+    });
+  }, [experts, searchQuery, locationFilter]);
+
+  // Memoized filtered collaborators for better performance
+  const filteredCollaborators = useMemo(() => {
+    return collaborators.filter(collab => {
+      if (!searchQuery && !locationFilter) return true;
+      const query = searchQuery?.toLowerCase() || '';
+      const location = locationFilter?.toLowerCase() || '';
+      
+      const matchesQuery = !query || (
+        collab.name?.toLowerCase().includes(query) ||
+        collab.affiliation?.toLowerCase().includes(query) ||
+        collab.institution?.toLowerCase().includes(query) ||
+        collab.specialization?.toLowerCase().includes(query)
+      );
+      
+      const matchesLocation = !location || (
+        collab.location?.toLowerCase().includes(location)
+      );
+      
+      return matchesQuery && matchesLocation;
+    });
+  }, [collaborators, searchQuery, locationFilter]);
 
   const fetchUserData = async () => {
     try {
@@ -214,14 +346,14 @@ export default function ResearcherDashboard() {
     }
   };
 
-  const fetchResearchers = async () => {
+  const fetchResearchers = useCallback(async (page = 1) => {
     try {
       // If there's a search query, use it as the condition to search by specialty
       const condition = searchQuery && searchQuery.trim() 
         ? encodeURIComponent(searchQuery.trim())
         : 'general';
       
-      let url = `/api/researchers?condition=${condition}&limit=100`;
+      let url = `/api/researchers?condition=${condition}&limit=100&page=${page}`;
       
       if (searchQuery && searchQuery.trim()) {
         // Also add as search parameter for name/institution search
@@ -232,27 +364,74 @@ export default function ResearcherDashboard() {
         // Add location filter for proximity-based sorting
         url += `&location=${encodeURIComponent(locationFilter.trim())}`;
       }
+      
+      // Add source filter
+      if (researcherSource && researcherSource !== 'all') {
+        url += `&source=${researcherSource}`;
+      }
 
-      console.log('Fetching researchers with URL:', url);
+      // Check client-side cache first
+      const cacheKey = `${researcherSource}-${condition}-${searchQuery}-${locationFilter}-${dateFilter}-${page}`;
+      if (researcherCache[cacheKey]) {
+        console.log('⚡ Using cached researchers');
+        setResearchers(researcherCache[cacheKey].researchers);
+        setResearcherPagination(researcherCache[cacheKey].pagination);
+        return;
+      }
+
+      console.log('🔍 Fetching researchers with URL:', url);
+      console.log('📊 Researcher source filter:', researcherSource);
       const response = await fetch(url);
       const data = await response.json();
-      console.log('Researchers found:', data.researchers?.length || 0);
+      console.log('✅ Researchers found:', data.researchers?.length || 0);
       
       // Filter out the current user
-      const filteredResearchers = (data.researchers || []).filter(
+      let filteredResearchers = (data.researchers || []).filter(
         researcher => researcher.id !== user?.userId
       );
       
+      // Apply date filter and sorting
+      if (dateFilter !== 'all') {
+        const months = parseInt(dateFilter);
+        const cutoffDate = new Date();
+        cutoffDate.setMonth(cutoffDate.getMonth() - months);
+        
+        filteredResearchers = filteredResearchers.filter(r => {
+          if (r.isInternalResearcher && r.updatedAt) {
+            const itemDate = new Date(r.updatedAt);
+            return itemDate >= cutoffDate;
+          }
+          return true; // Keep all external researchers
+        });
+      }
+      
+      // Sort by date - most recent first
+      filteredResearchers.sort((a, b) => {
+        const dateA = new Date(a.updatedAt || a.createdAt || 0);
+        const dateB = new Date(b.updatedAt || b.createdAt || 0);
+        return dateB - dateA;
+      });
+      
+      // Cache the results
+      setResearcherCache(prev => ({
+        ...prev,
+        [cacheKey]: {
+          researchers: filteredResearchers,
+          pagination: data.pagination
+        }
+      }));
+      
       setResearchers(filteredResearchers);
+      setResearcherPagination(data.pagination);
     } catch (error) {
       console.error('Error fetching researchers:', error);
       setResearchers([]);
     }
-  };
+  }, [searchQuery, locationFilter, researcherSource, dateFilter, user, researcherCache]);
 
-  const fetchExperts = async () => {
+  const fetchExperts = useCallback(async (page = 1) => {
     try {
-      let url = '/api/researchers?condition=medicine&limit=100';
+      let url = `/api/researchers?condition=medicine&limit=100&page=${page}`;
       
       if (searchQuery && searchQuery.trim()) {
         // If there's a search query, search by name, specialty, or institution
@@ -264,30 +443,80 @@ export default function ResearcherDashboard() {
         url += `&location=${encodeURIComponent(locationFilter.trim())}`;
       }
 
-      console.log('Fetching experts with URL:', url);
+      // Check client-side cache first
+      const cacheKey = `experts-${searchQuery}-${locationFilter}-${dateFilter}-${page}`;
+      if (researcherCache[cacheKey]) {
+        console.log('⚡ Using cached experts');
+        setExperts(researcherCache[cacheKey].experts);
+        setResearcherPagination(researcherCache[cacheKey].pagination);
+        return;
+      }
+
+      console.log('🔍 Fetching experts with URL:', url);
       const response = await fetch(url);
       const data = await response.json();
-      console.log('Experts found:', data.researchers?.length || 0);
+      console.log('✅ Experts found:', data.researchers?.length || 0);
       
       // Filter out the current user
-      const filteredExperts = (data.researchers || []).filter(
+      let filteredExperts = (data.researchers || []).filter(
         expert => expert.id !== user?.userId
       );
       
+      // Apply date filter and sorting
+      if (dateFilter !== 'all') {
+        const months = parseInt(dateFilter);
+        const cutoffDate = new Date();
+        cutoffDate.setMonth(cutoffDate.getMonth() - months);
+        
+        filteredExperts = filteredExperts.filter(r => {
+          if (r.isInternalResearcher && r.updatedAt) {
+            const itemDate = new Date(r.updatedAt);
+            return itemDate >= cutoffDate;
+          }
+          return true; // Keep all external researchers
+        });
+      }
+      
+      // Sort by date - most recent first
+      filteredExperts.sort((a, b) => {
+        const dateA = new Date(a.updatedAt || a.createdAt || 0);
+        const dateB = new Date(b.updatedAt || b.createdAt || 0);
+        return dateB - dateA;
+      });
+      
+      // Cache the results
+      setResearcherCache(prev => ({
+        ...prev,
+        [cacheKey]: {
+          experts: filteredExperts,
+          pagination: data.pagination
+        }
+      }));
+      
       setExperts(filteredExperts);
+      setResearcherPagination(data.pagination);
     } catch (error) {
       console.error('Error fetching experts:', error);
       setExperts([]);
     }
-  };
+  }, [searchQuery, locationFilter, dateFilter, user, researcherCache]);
 
-  const fetchCollaborators = async () => {
+  const fetchCollaborators = useCallback(async () => {
     try {
       let url = '/api/researcher/collaborators?limit=100'; // Fetch more researchers
       if (searchQuery && searchQuery.trim()) {
         url += `&search=${encodeURIComponent(searchQuery.trim())}`;
       }
 
+      // Check client-side cache first
+      const cacheKey = `collaborators-${searchQuery}`;
+      if (researcherCache[cacheKey]) {
+        console.log('⚡ Using cached collaborators');
+        setCollaborators(researcherCache[cacheKey]);
+        return;
+      }
+
+      console.log('🔍 Fetching collaborators');
       const response = await fetch(url);
       const data = await response.json();
       
@@ -296,12 +525,19 @@ export default function ResearcherDashboard() {
         collab => collab.id !== user?.userId
       );
       
+      // Cache the results
+      setResearcherCache(prev => ({
+        ...prev,
+        [cacheKey]: filteredCollaborators
+      }));
+      
       setCollaborators(filteredCollaborators);
+      console.log('✅ Collaborators found:', filteredCollaborators.length);
     } catch (error) {
       console.error('Error fetching collaborators:', error);
       setCollaborators([]);
     }
-  };
+  }, [searchQuery, user, researcherCache]);
 
   const fetchMyTrials = async () => {
     try {
@@ -374,14 +610,24 @@ export default function ResearcherDashboard() {
     }
   };
 
-  const fetchPublications = async () => {
+  const fetchPublications = useCallback(async (page = 1) => {
     try {
+      // Check client-side cache first
+      const cacheKey = `${publicationSources.join(',')}-${searchQuery}-${dateFilter}-${page}`;
+      if (publicationCache[cacheKey]) {
+        console.log('⚡ Using cached publications');
+        setPublications(publicationCache[cacheKey].user);
+        setExternalPublications(publicationCache[cacheKey].external);
+        setPublicationPagination(publicationCache[cacheKey].pagination);
+        return;
+      }
+
       // First get user's own publications
       const userPubsResponse = await fetch('/api/researcher/publications');
       const userPubsData = await userPubsResponse.json();
       const userPubs = userPubsData.publications || [];
 
-      console.log('User publications:', userPubs.length);
+      console.log('📖 User publications:', userPubs.length);
       // Set user's own publications
       setPublications(userPubs);
 
@@ -391,14 +637,15 @@ export default function ResearcherDashboard() {
       if (searchQuery && searchQuery.trim()) {
         // If there's a search query, use it
         searchConditions = [searchQuery.trim()];
-        console.log('Searching external publications for query:', searchQuery);
+        console.log('🔍 Searching external publications for query:', searchQuery);
       } else {
         // Otherwise use researcher's specialties
         searchConditions = user?.researcherProfile?.specialties || [];
-        console.log('Searching external publications for specialties:', searchConditions);
+        console.log('🔍 Searching external publications for specialties:', searchConditions);
       }
 
       let externalPubs = [];
+      let paginationInfo = null;
       if (searchConditions.length > 0) {
         // Search for each condition and combine results
         for (const condition of searchConditions) {
@@ -406,12 +653,18 @@ export default function ResearcherDashboard() {
             const searchParams = new URLSearchParams();
             searchParams.append('condition', condition);
             searchParams.append('limit', '50');
+            searchParams.append('page', page.toString());
+            // Add source filters
+            searchParams.append('sources', publicationSources.join(','));
 
-            console.log(`Fetching publications for condition: ${condition}`);
+            console.log(`🔍 Fetching publications for condition: ${condition} from sources: ${publicationSources.join(', ')}`);
             const externalResponse = await fetch(`/api/publications?${searchParams}`);
             const externalData = await externalResponse.json();
             const pubs = externalData.publications || [];
-            console.log(`  - Found ${pubs.length} publications for ${condition}`);
+            paginationInfo = externalData.pagination;
+            console.log(`📚 Found ${pubs.length} publications for ${condition}`);
+            console.log(`📊 Source breakdown:`, externalData.sourceBreakdown);
+            console.log(`💾 Cached:`, externalData.cached);
             console.log(`  - Internal: ${externalData.internal || 0}, External: ${externalData.external || 0}`);
             externalPubs.push(...pubs);
           } catch (err) {
@@ -432,21 +685,38 @@ export default function ResearcherDashboard() {
       console.log('After removing user publications:', filteredExternalPubs.length);
 
       // Set external publications separately (remove duplicates)
-      const uniquePubs = filteredExternalPubs.filter((pub, index, self) =>
+      let uniquePubs = filteredExternalPubs.filter((pub, index, self) =>
         index === self.findIndex((p) => 
           (p.pmid && pub.pmid && p.pmid === pub.pmid) ||
           (p.doi && pub.doi && p.doi === pub.doi) ||
           (p.id && pub.id && p.id === pub.id)
         )
       );
+      
+      // Apply date filter (filter by publishedDate field)
+      uniquePubs = filterByDate(uniquePubs, 'publishedDate');
+      const filteredUserPubs = filterByDate(userPubs, 'publishedDate');
+      
+      // Cache the results
+      setPublicationCache(prev => ({
+        ...prev,
+        [cacheKey]: {
+          user: filteredUserPubs,
+          external: uniquePubs,
+          pagination: paginationInfo
+        }
+      }));
+      
+      setPublications(filteredUserPubs);
       setExternalPublications(uniquePubs);
-      console.log('Final unique external publications:', uniquePubs.length);
+      setPublicationPagination(paginationInfo);
+      console.log('✅ Final unique external publications:', uniquePubs.length);
     } catch (error) {
-      console.error('Error fetching publications:', error);
+      console.error('❌ Error fetching publications:', error);
       setPublications([]);
       setExternalPublications([]);
     }
-  };
+  }, [publicationSources, searchQuery, dateFilter, user, publicationCache, filterByDate]);
 
   const fetchForums = async () => {
     try {
@@ -621,25 +891,28 @@ export default function ResearcherDashboard() {
         user={user}
         onLogout={handleLogout}
         isResearcher={true}
-        unreadCount={unreadCount}
       />
+
+      {/* Notification Bell */}
+      <NotificationBell user={user} />
 
       {/* Cura AI Assistant */}
       <CuraAI />
 
-      <div className="pr-4 sm:pr-20 pl-4 sm:pl-8 py-4 sm:py-8">
+      {/* Main Content - fixed header at top */}
+      <div className="px-4 sm:px-6 md:px-8 pt-4 pb-6 sm:pb-8">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-6 sm:mb-8">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+          {/* Header - Fixed at top */}
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-1">
               {getSectionTitle()}
             </h1>
-            <p className="text-base sm:text-lg text-gray-600">{getSectionDescription()}</p>
+            <p className="text-sm sm:text-base text-gray-600">{getSectionDescription()}</p>
           </div>
 
           {/* Search Bar (for trials section) */}
           {activeSection === 'trials' && (
-            <div className="mb-4 sm:mb-6">
+            <div className="mb-3 sm:mb-4">
               <div className="relative max-w-2xl">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <Input
@@ -662,13 +935,35 @@ export default function ResearcherDashboard() {
                   Search
                 </Button>
               </div>
+              
+              {/* Date Range Filter Dropdown for Trials */}
+              <div className="flex items-center gap-2 mt-4">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Started:
+                </label>
+                <select
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={dateFilter}
+                  onChange={(e) => {
+                    setDateFilter(e.target.value);
+                    setTimeout(() => fetchMyTrials(), 0);
+                  }}
+                >
+                  <option value="all">All Time</option>
+                  <option value="6">Last 6 Months</option>
+                  <option value="12">Last 1 Year</option>
+                  <option value="24">Last 2 Years</option>
+                  <option value="36">Last 3 Years</option>
+                </select>
+              </div>
             </div>
           )}
 
           {/* Search Bar (for publications section) */}
           {activeSection === 'publications' && (
-            <div className="mb-4 sm:mb-6">
-              <div className="relative max-w-2xl">
+            <div className="mb-3 sm:mb-4">
+              <div className="relative max-w-2xl mb-4">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <Input
                   type="text"
@@ -690,12 +985,63 @@ export default function ResearcherDashboard() {
                   Search
                 </Button>
               </div>
+              
+              {/* Filters Row */}
+              <div className="flex items-center gap-4 flex-wrap">
+                {/* Source Filter Dropdown */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Filter className="w-4 h-4" />
+                    Sources:
+                  </label>
+                  <select
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={publicationSources.length === 3 ? 'all' : publicationSources[0]}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === 'all') {
+                        setPublicationSources(['pubmed', 'arxiv', 'orcid']);
+                      } else {
+                        setPublicationSources([value]);
+                      }
+                      setTimeout(() => fetchPublications(), 0);
+                    }}
+                  >
+                    <option value="all">All Sources</option>
+                    <option value="pubmed">PubMed Only</option>
+                    <option value="arxiv">arXiv Only</option>
+                    <option value="orcid">ORCID Only</option>
+                  </select>
+                </div>
+                
+                {/* Date Range Filter Dropdown */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    Published:
+                  </label>
+                  <select
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={dateFilter}
+                    onChange={(e) => {
+                      setDateFilter(e.target.value);
+                      setTimeout(() => fetchPublications(), 0);
+                    }}
+                  >
+                    <option value="all">All Time</option>
+                    <option value="6">Last 6 Months</option>
+                    <option value="12">Last 1 Year</option>
+                    <option value="24">Last 2 Years</option>
+                    <option value="36">Last 3 Years</option>
+                  </select>
+                </div>
+              </div>
             </div>
           )}
 
           {/* Search Bar (for researchers section) */}
           {activeSection === 'researchers' && (
-            <div className="mb-6">
+            <div className="mb-3 sm:mb-4">
               <div className="grid md:grid-cols-2 gap-4 max-w-4xl">
                 {/* Name/Specialty Search */}
                 <div className="relative">
@@ -755,53 +1101,149 @@ export default function ResearcherDashboard() {
                   </Button>
                 )}
               </div>
+              
+              {/* Filters Row */}
+              <div className="flex items-center gap-4 flex-wrap mt-4">
+                {/* Source Filter Dropdown */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Filter className="w-4 h-4" />
+                    Sources:
+                  </label>
+                  <select
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={researcherSource}
+                    onChange={(e) => {
+                      setResearcherSource(e.target.value);
+                      setTimeout(() => fetchResearchers(), 0);
+                    }}
+                  >
+                    <option value="all">All Sources</option>
+                    <option value="internal">Curalink Only</option>
+                    <option value="pubmed">PubMed Only</option>
+                    <option value="orcid">ORCID Only</option>
+                    <option value="scholar">Google Scholar Only</option>
+                  </select>
+                </div>
+                
+                {/* Date Range Filter Dropdown */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    Updated:
+                  </label>
+                  <select
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={dateFilter}
+                    onChange={(e) => {
+                      setDateFilter(e.target.value);
+                      setTimeout(() => fetchResearchers(), 0);
+                    }}
+                  >
+                    <option value="all">All Time</option>
+                    <option value="6">Last 6 Months</option>
+                    <option value="12">Last 1 Year</option>
+                    <option value="24">Last 2 Years</option>
+                    <option value="36">Last 3 Years</option>
+                  </select>
+                </div>
+              </div>
             </div>
           )}
 
           {/* Search Bar (for experts section) */}
           {activeSection === 'experts' && (
-            <div className="mb-6">
-              <div className="relative max-w-2xl">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  type="text"
-                  placeholder="Search experts by name, specialty, or field..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-12 pr-28 py-3 w-full"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      fetchExperts();
-                    }
-                  }}
-                />
-                {searchQuery && (
+            <div className="mb-3 sm:mb-4">
+              <div className="grid md:grid-cols-2 gap-4 max-w-4xl">
+                {/* Name/Specialty Search */}
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    type="text"
+                    placeholder="Search by name, specialty, or institution..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-12 pr-4 py-3 w-full"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        fetchExperts();
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* Location Search */}
+                <div className="relative">
+                  <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    type="text"
+                    placeholder="Filter by location (city, state, or country)..."
+                    value={locationFilter}
+                    onChange={(e) => setLocationFilter(e.target.value)}
+                    className="pl-12 pr-4 py-3 w-full"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        fetchExperts();
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Search Actions */}
+              <div className="flex gap-2 mt-4 max-w-4xl">
+                <Button 
+                  size="sm"
+                  onClick={fetchExperts}
+                >
+                  <Search className="w-4 h-4 mr-2" />
+                  Search
+                </Button>
+                {(searchQuery || locationFilter) && (
                   <Button 
-                    className="absolute right-24 top-1/2 transform -translate-y-1/2"
                     size="sm"
                     variant="outline"
                     onClick={() => {
                       setSearchQuery('');
-                      fetchExperts();
+                      setLocationFilter('');
+                      setTimeout(fetchExperts, 0);
                     }}
                   >
-                    Clear
+                    Clear Filters
                   </Button>
                 )}
-                <Button 
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                  size="sm"
-                  onClick={fetchExperts}
-                >
-                  Search
-                </Button>
+              </div>
+              
+              {/* Filters Row */}
+              <div className="flex items-center gap-4 flex-wrap mt-4">
+                {/* Date Range Filter Dropdown */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    Updated:
+                  </label>
+                  <select
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={dateFilter}
+                    onChange={(e) => {
+                      setDateFilter(e.target.value);
+                      setTimeout(() => fetchExperts(), 0);
+                    }}
+                  >
+                    <option value="all">All Time</option>
+                    <option value="6">Last 6 Months</option>
+                    <option value="12">Last 1 Year</option>
+                    <option value="24">Last 2 Years</option>
+                    <option value="36">Last 3 Years</option>
+                  </select>
+                </div>
               </div>
             </div>
           )}
 
           {/* Search Bar (for collaborators section) */}
           {activeSection === 'collaborators' && (
-            <div className="mb-6">
+            <div className="mb-3 sm:mb-4">
               <div className="grid md:grid-cols-2 gap-4 max-w-4xl">
                 {/* Name/Specialty Search */}
                 <div className="relative">
@@ -883,15 +1325,29 @@ export default function ResearcherDashboard() {
               )}
 
               {activeSection === 'researchers' && (
-                <ResearchersContent researchers={researchers} />
+                <ResearchersContent 
+                  researchers={filteredResearchers} 
+                  pagination={researcherPagination}
+                  onPageChange={(page) => {
+                    setResearcherPage(page);
+                    fetchResearchers(page);
+                  }}
+                />
               )}
 
               {activeSection === 'experts' && (
-                <ExpertsContent experts={experts} />
+                <ExpertsContent 
+                  experts={filteredExperts}
+                  pagination={expertPagination}
+                  onPageChange={(page) => {
+                    setExpertPage(page);
+                    fetchExperts(page);
+                  }}
+                />
               )}
 
               {activeSection === 'collaborators' && (
-                <CollaboratorsContent collaborators={collaborators} />
+                <CollaboratorsContent collaborators={filteredCollaborators} />
               )}
 
               {activeSection === 'trials' && (
@@ -909,15 +1365,20 @@ export default function ResearcherDashboard() {
                 <PublicationsContent 
                   userPublications={publications}
                   externalPublications={externalPublications}
-                  onRefresh={fetchPublications}
+                  onRefresh={() => fetchPublications(publicationPage)}
                   onUserDataRefresh={fetchUserData}
                   toggleFavorite={toggleFavorite}
                   isFavorited={isFavorited}
+                  pagination={publicationPagination}
+                  onPageChange={(page) => {
+                    setPublicationPage(page);
+                    fetchPublications(page);
+                  }}
                 />
               )}
 
               {activeSection === 'forums' && (
-                <ForumsContent forums={forums} />
+                <EnhancedForums forums={forums} currentUser={user} isResearcher={true} />
               )}
 
               {activeSection === 'notifications' && (
@@ -1068,7 +1529,7 @@ function DashboardContent({ data, onSectionChange }) {
   return (
     <div className="space-y-8">
       {/* Stats Grid */}
-      <div className="grid md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
         {stats.map((stat, index) => (
           <Card 
             key={index}
@@ -1085,8 +1546,8 @@ function DashboardContent({ data, onSectionChange }) {
       {/* Researchers Section */}
       {displayResearchers.length > 0 && (
         <div>
-          <h2 className="text-2xl font-bold mb-4">Researchers in Your Field</h2>
-          <div className="grid md:grid-cols-3 gap-6">
+          <h2 className="text-xl sm:text-2xl font-bold mb-4">Researchers in Your Field</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
             {displayResearchers.map((researcher) => (
               <Card key={researcher.id} className="p-6 hover:shadow-lg transition-shadow">
                 <div className="flex items-start justify-between mb-3">
@@ -1177,8 +1638,8 @@ function DashboardContent({ data, onSectionChange }) {
       {/* Clinical Trials Section */}
       {allTrials.length > 0 && (
         <div>
-          <h2 className="text-2xl font-bold mb-4">Clinical Trials</h2>
-          <div className="grid md:grid-cols-3 gap-6">
+          <h2 className="text-xl sm:text-2xl font-bold mb-4">Clinical Trials</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
             {allTrials.map((trial) => (
               <Card key={trial.id || trial.nctId} className="p-6 hover:shadow-lg transition-shadow">
                 <div className="flex items-center justify-between mb-3">
@@ -1218,8 +1679,8 @@ function DashboardContent({ data, onSectionChange }) {
       {/* Publications Section */}
       {allPublications.length > 0 && (
         <div>
-          <h2 className="text-2xl font-bold mb-4">Recent Publications</h2>
-          <div className="grid md:grid-cols-3 gap-6">
+          <h2 className="text-xl sm:text-2xl font-bold mb-4">Recent Publications</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
             {allPublications.map((pub) => {
               // Handle author - could be string or object
               let authorName = 'Unknown Author';
@@ -1273,7 +1734,7 @@ function DashboardContent({ data, onSectionChange }) {
 }
 
 // Researchers Content Component
-function ResearchersContent({ researchers }) {
+function ResearchersContent({ researchers, pagination, onPageChange }) {
   const [connecting, setConnecting] = useState({});
   const [following, setFollowing] = useState({});
   const [accepting, setAccepting] = useState({});
@@ -1377,7 +1838,8 @@ function ResearchersContent({ researchers }) {
   }
 
   return (
-    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
       {researchers.map((researcher) => (
         <Card key={researcher.id} className="p-6">
           <div className="flex items-start justify-between mb-4">
@@ -1556,14 +2018,40 @@ function ResearchersContent({ researchers }) {
         </Card>
       ))}
     </div>
+    
+    {/* Pagination Controls */}
+    {pagination && pagination.totalPages > 1 && (
+      <div className="mt-6 flex items-center justify-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pagination.page === 1}
+          onClick={() => onPageChange && onPageChange(pagination.page - 1)}
+        >
+          Previous
+        </Button>
+        <span className="text-sm text-gray-600">
+          Page {pagination.page} of {pagination.totalPages} ({pagination.totalCount} total)
+        </span>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!pagination.hasMore}
+          onClick={() => onPageChange && onPageChange(pagination.page + 1)}
+        >
+          Next
+        </Button>
+      </div>
+    )}
+    </>
   );
 }
 
 // Experts Content Component  
-function ExpertsContent({ experts }) {
+function ExpertsContent({ experts, pagination, onPageChange }) {
   const [connecting, setConnecting] = useState({});
 
-  const handleConnect = async (expertId) => {
+  const handleConnect = useCallback(async (expertId) => {
     setConnecting(prev => ({ ...prev, [expertId]: true }));
     try {
       const response = await fetch('/api/researcher/connect', {
@@ -1584,7 +2072,7 @@ function ExpertsContent({ experts }) {
     } finally {
       setConnecting(prev => ({ ...prev, [expertId]: false }));
     }
-  };
+  }, []);
 
   if (experts.length === 0) {
     return (
@@ -1597,7 +2085,8 @@ function ExpertsContent({ experts }) {
   }
 
   return (
-    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
       {experts.map((expert) => (
         <Card key={expert.id} className="p-6">
           <div className="flex items-start justify-between mb-4">
@@ -1699,6 +2188,32 @@ function ExpertsContent({ experts }) {
         </Card>
       ))}
     </div>
+    
+    {/* Pagination Controls */}
+    {pagination && pagination.totalPages > 1 && (
+      <div className="mt-6 flex items-center justify-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pagination.page === 1}
+          onClick={() => onPageChange && onPageChange(pagination.page - 1)}
+        >
+          Previous
+        </Button>
+        <span className="text-sm text-gray-600">
+          Page {pagination.page} of {pagination.totalPages} ({pagination.totalCount} total)
+        </span>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!pagination.hasMore}
+          onClick={() => onPageChange && onPageChange(pagination.page + 1)}
+        >
+          Next
+        </Button>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -1708,7 +2223,7 @@ function CollaboratorsContent({ collaborators }) {
   const [accepting, setAccepting] = useState({});
   const router = useRouter();
 
-  const handleConnect = async (collaboratorId) => {
+  const handleConnect = useCallback(async (collaboratorId) => {
     setConnecting(prev => ({ ...prev, [collaboratorId]: true }));
     try {
       const response = await fetch('/api/researcher/connect', {
@@ -1730,9 +2245,9 @@ function CollaboratorsContent({ collaborators }) {
     } finally {
       setConnecting(prev => ({ ...prev, [collaboratorId]: false }));
     }
-  };
+  }, []);
 
-  const handleAccept = async (connectionId, collaboratorName) => {
+  const handleAccept = useCallback(async (connectionId, collaboratorName) => {
     setAccepting(prev => ({ ...prev, [connectionId]: true }));
     try {
       const response = await fetch('/api/researcher/connect', {
@@ -1754,12 +2269,12 @@ function CollaboratorsContent({ collaborators }) {
     } finally {
       setAccepting(prev => ({ ...prev, [connectionId]: false }));
     }
-  };
+  }, []);
 
-  const handleChat = (collaboratorId, collaboratorName) => {
+  const handleChat = useCallback((collaboratorId, collaboratorName) => {
     // Navigate to chat page
     router.push(`/researcher/chat?userId=${collaboratorId}&userName=${encodeURIComponent(collaboratorName)}`);
-  };
+  }, [router]);
 
   if (collaborators.length === 0) {
     return (
@@ -1772,7 +2287,7 @@ function CollaboratorsContent({ collaborators }) {
   }
 
   return (
-    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
       {collaborators.map((collaborator) => (
         <Card key={collaborator.id} className="p-6">
           <div className="flex items-start justify-between mb-4">
@@ -2608,9 +3123,15 @@ function PublicationCard({ publication, index, isUserPub, toggleFavorite, isFavo
               className={`w-5 h-5 ${favorited ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
             />
           </button>
-          {!isUserPub && (
-            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-              PubMed
+          {!isUserPub && publication.source && (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+              publication.source === 'PubMed' ? 'bg-green-100 text-green-700' :
+              publication.source === 'arXiv' ? 'bg-purple-100 text-purple-700' :
+              publication.source === 'ORCID' ? 'bg-blue-100 text-blue-700' :
+              publication.source === 'ResearchGate' ? 'bg-orange-100 text-orange-700' :
+              'bg-gray-100 text-gray-700'
+            }`}>
+              {publication.source}
             </span>
           )}
         </div>
@@ -2683,7 +3204,7 @@ function PublicationCard({ publication, index, isUserPub, toggleFavorite, isFavo
 }
 
 // Publications Content Component
-function PublicationsContent({ userPublications, externalPublications, onRefresh, onUserDataRefresh, toggleFavorite, isFavorited }) {
+function PublicationsContent({ userPublications, externalPublications, onRefresh, onUserDataRefresh, toggleFavorite, isFavorited, pagination, onPageChange }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newPublication, setNewPublication] = useState({
     title: '',
@@ -2695,7 +3216,7 @@ function PublicationsContent({ userPublications, externalPublications, onRefresh
   });
   const [adding, setAdding] = useState(false);
 
-  const handleAddPublication = async (e) => {
+  const handleAddPublication = useCallback(async (e) => {
     e.preventDefault();
     setAdding(true);
 
@@ -2729,12 +3250,12 @@ function PublicationsContent({ userPublications, externalPublications, onRefresh
     } finally {
       setAdding(false);
     }
-  };
+  }, [newPublication, onRefresh, onUserDataRefresh]);
 
-  const renderPublicationCard = (pub, index, isUserPub = false) => {
+  const renderPublicationCard = useCallback((pub, index, isUserPub = false) => {
     const pubId = pub.id || pub.pmid || `pub-${index}`;
     return <PublicationCard key={pubId} publication={pub} index={index} isUserPub={isUserPub} toggleFavorite={toggleFavorite} isFavorited={isFavorited} />;
-  };
+  }, [toggleFavorite, isFavorited]);
 
   return (
     <>
@@ -2767,13 +3288,40 @@ function PublicationsContent({ userPublications, externalPublications, onRefresh
         </Card>
       )}
 
-      {/* External Publications from PubMed */}
+      {/* External Publications */}
       {externalPublications.length > 0 && (
         <div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Related Publications from PubMed</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">
+            Related Publications from External Sources
+          </h2>
           <div className="space-y-4">
             {externalPublications.map((pub, index) => renderPublicationCard(pub, index, false))}
           </div>
+          
+          {/* Pagination Controls */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pagination.page === 1}
+                onClick={() => onPageChange && onPageChange(pagination.page - 1)}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-gray-600">
+                Page {pagination.page} of {pagination.totalPages} ({pagination.totalCount} total)
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!pagination.hasMore}
+                onClick={() => onPageChange && onPageChange(pagination.page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -3445,6 +3993,7 @@ function ProfileContent({ user, onUpdate }) {
   const [formData, setFormData] = useState({
     name: user.name || '',
     email: user.email || '',
+    avatar: user.avatar || '',
     specialties: user.researcherProfile?.specialties?.join(', ') || '',
     institution: user.researcherProfile?.institution || '',
     location: user.researcherProfile?.location || '',
@@ -3454,12 +4003,78 @@ function ProfileContent({ user, onUpdate }) {
     meetingSchedule: user.researcherProfile?.meetingSchedule || ''
   });
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState(user.avatar || '');
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.');
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File too large. Maximum size is 5MB.');
+      return;
+    }
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload file
+    setUploading(true);
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append('avatar', file);
+
+      const response = await fetch('/api/upload/avatar', {
+        method: 'POST',
+        body: uploadFormData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setFormData({ ...formData, avatar: data.avatarUrl });
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to upload avatar');
+        setAvatarPreview(formData.avatar);
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      alert('Error uploading avatar');
+      setAvatarPreview(formData.avatar);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
 
     try {
+      // First update avatar if changed
+      if (formData.avatar !== user.avatar) {
+        await fetch('/api/auth/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            avatar: formData.avatar || null
+          })
+        });
+      }
+
+      // Then update researcher profile
       const response = await fetch('/api/researcher/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -3495,9 +4110,17 @@ function ProfileContent({ user, onUpdate }) {
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div className="flex items-center gap-4">
-            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-3xl">
-              {user.name?.charAt(0).toUpperCase()}
-            </div>
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user.name}
+                className="w-20 h-20 rounded-full object-cover border-2 border-blue-200"
+              />
+            ) : (
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-3xl">
+                {user.name?.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div>
               <h2 className="text-3xl font-bold text-gray-900">{user.name}</h2>
               <p className="text-gray-600">{user.email}</p>
@@ -3516,6 +4139,44 @@ function ProfileContent({ user, onUpdate }) {
         {/* Profile Form */}
         {isEditing ? (
           <form onSubmit={handleSave} className="space-y-6">
+            {/* Avatar Section */}
+            <div className="border-b pb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Profile Picture
+              </label>
+              <div className="flex items-center gap-4">
+                {avatarPreview ? (
+                  <img
+                    src={avatarPreview}
+                    alt="Avatar preview"
+                    className="w-20 h-20 rounded-full object-cover border-2 border-blue-200"
+                  />
+                ) : (
+                  <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-2xl">
+                    {user.name?.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    id="avatar-upload-researcher"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="avatar-upload-researcher"
+                    className="inline-block px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 transition-colors"
+                  >
+                    {uploading ? 'Uploading...' : 'Choose Image'}
+                  </label>
+                  <p className="text-xs text-gray-500 mt-2">
+                    JPG, PNG, GIF or WebP. Max size 5MB.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>

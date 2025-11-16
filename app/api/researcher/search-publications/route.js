@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { searchPubMed, fetchPubMedDetails } from '@/lib/pubmed';
+import { searchPubMed } from '@/lib/pubmed';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -55,19 +55,8 @@ export async function GET(request) {
 
     console.log('Searching PubMed for researcher:', query);
 
-    // Search PubMed
-    const ids = await searchPubMed(query, limit);
-    
-    if (ids.length === 0) {
-      return NextResponse.json({ 
-        publications: [],
-        count: 0,
-        query 
-      });
-    }
-
-    // Fetch details for found publications
-    const publications = await fetchPubMedDetails(ids);
+    // Search PubMed - returns full publication objects
+    const publications = await searchPubMed({ query, limit });
 
     return NextResponse.json({ 
       publications,
