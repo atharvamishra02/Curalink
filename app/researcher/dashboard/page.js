@@ -3128,7 +3128,6 @@ function PublicationCard({ publication, index, isUserPub, toggleFavorite, isFavo
               publication.source === 'PubMed' ? 'bg-green-100 text-green-700' :
               publication.source === 'arXiv' ? 'bg-purple-100 text-purple-700' :
               publication.source === 'ORCID' ? 'bg-blue-100 text-blue-700' :
-              publication.source === 'ResearchGate' ? 'bg-orange-100 text-orange-700' :
               'bg-gray-100 text-gray-700'
             }`}>
               {publication.source}

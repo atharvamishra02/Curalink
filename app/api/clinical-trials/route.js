@@ -3,7 +3,6 @@ import { searchClinicalTrials } from '@/lib/clinicalTrials';
 import { searchClinicalTrials as searchAACT } from '@/lib/aact';
 import { searchPubMed } from '@/lib/pubmed';
 import { searchArXiv } from '@/lib/arxiv';
-import { searchResearchGate } from '@/lib/researchgate';
 import { cache } from '@/lib/redis';
 import prisma from '@/lib/prisma';
 
@@ -358,20 +357,7 @@ export async function GET(request) {
       }
     }
 
-    // Fetch from ResearchGate if selected (currently not available)
-    if ((source === 'all' || source === 'researchgate') && searchTerm) {
-      try {
-        console.log('🔍 Fetching from ResearchGate...');
-        const rgResults = await searchResearchGate({
-          query: searchTerm,
-          limit: limit
-        });
-        externalTrials.push(...rgResults);
-        console.log(`✅ Fetched ${rgResults.length} results from ResearchGate`);
-      } catch (rgError) {
-        console.error('❌ Error fetching from ResearchGate:', rgError.message);
-      }
-    }
+
 
     // Combine both lists - internal first, then external
     const allTrials = [...formattedInternalTrials, ...externalTrials];

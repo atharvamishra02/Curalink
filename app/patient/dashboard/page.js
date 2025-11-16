@@ -52,7 +52,7 @@ export default function PatientDashboard() {
   
   // Source filters for researchers and publications
   const [researcherSource, setResearcherSource] = useState('all'); // 'all', 'internal', 'pubmed', 'scholar', 'orcid'
-  const [publicationSource, setPublicationSource] = useState('all'); // 'all', 'internal', 'pubmed', 'researchgate', 'orcid', 'arxiv'
+  const [publicationSource, setPublicationSource] = useState('all'); // 'all', 'internal', 'pubmed', 'orcid', 'arxiv'
   const [trialSource, setTrialSource] = useState('all'); // 'all', 'internal', 'clinicaltrials', 'pubmed', 'arxiv'
   const [dateFilter, setDateFilter] = useState('all'); // 'all', '6', '12', '24', '36' (months)
   
