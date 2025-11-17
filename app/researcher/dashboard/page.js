@@ -33,6 +33,7 @@ import HamburgerMenu from '@/components/HamburgerMenu';
 import CuraAI from '@/components/CuraAI';
 import NotificationBell from '@/components/NotificationBell';
 import EnhancedForums from '@/components/EnhancedForums';
+import ResearcherProfileModal from '@/components/ResearcherProfileModal';
 import { useToast } from '@/components/ToastProvider';
 
 export default function ResearcherDashboard() {
@@ -56,9 +57,14 @@ export default function ResearcherDashboard() {
   const [forums, setForums] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
-  const [publicationSources, setPublicationSources] = useState(['pubmed', 'arxiv', 'orcid']);
+  const [publicationSources, setPublicationSources] = useState(['internal', 'pubmed', 'arxiv', 'orcid']);
   const [researcherSource, setResearcherSource] = useState('all'); // 'all', 'internal', 'pubmed', 'scholar', 'orcid'
   const [dateFilter, setDateFilter] = useState('all'); // 'all', '6', '12', '24', '36' (months)
+  
+  // Clinical trial filters
+  const [phaseFilter, setPhaseFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [trialSource, setTrialSource] = useState('all'); // 'all', 'internal', 'clinicaltrials', 'pubmed', 'arxiv'
   
   // Pagination states
   const [publicationPage, setPublicationPage] = useState(1);
@@ -67,6 +73,10 @@ export default function ResearcherDashboard() {
   const [publicationPagination, setPublicationPagination] = useState(null);
   const [researcherPagination, setResearcherPagination] = useState(null);
   const [expertPagination, setExpertPagination] = useState(null);
+  
+  // Researcher Profile Modal
+  const [selectedResearcher, setSelectedResearcher] = useState(null);
+  const [showResearcherModal, setShowResearcherModal] = useState(false);
   
   // Client-side cache for faster switching between sources
   const [researcherCache, setResearcherCache] = useState({});
@@ -118,6 +128,15 @@ export default function ResearcherDashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection, user]);
+  
+  // Refetch trials when filters change
+  useEffect(() => {
+    if (user && activeSection === 'trials') {
+      console.log('🔄 Refetching trials due to filter change:', { trialSource, phaseFilter, statusFilter });
+      fetchSectionData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trialSource, phaseFilter, statusFilter]);
 
   // Memoized filtered publications for better performance
   const filteredPublications = useMemo(() => {
@@ -571,6 +590,17 @@ export default function ResearcherDashboard() {
             const searchParams = new URLSearchParams();
             searchParams.append('condition', condition);
             searchParams.append('limit', '50');
+            
+            // Add filters
+            if (phaseFilter) {
+              searchParams.append('phase', phaseFilter);
+            }
+            if (statusFilter) {
+              searchParams.append('status', statusFilter);
+            }
+            if (trialSource && trialSource !== 'all') {
+              searchParams.append('source', trialSource);
+            }
 
             console.log(`Fetching trials for condition: ${condition}`);
             const externalResponse = await fetch(`/api/clinical-trials?${searchParams}`);
@@ -936,26 +966,82 @@ export default function ResearcherDashboard() {
                 </Button>
               </div>
               
-              {/* Date Range Filter Dropdown for Trials */}
-              <div className="flex items-center gap-2 mt-4">
-                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  Started:
-                </label>
-                <select
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={dateFilter}
-                  onChange={(e) => {
-                    setDateFilter(e.target.value);
-                    setTimeout(() => fetchMyTrials(), 0);
-                  }}
-                >
-                  <option value="all">All Time</option>
-                  <option value="6">Last 6 Months</option>
-                  <option value="12">Last 1 Year</option>
-                  <option value="24">Last 2 Years</option>
-                  <option value="36">Last 3 Years</option>
-                </select>
+              {/* Filters for Trials */}
+              <div className="flex flex-wrap items-center gap-3 mt-4">
+                {/* Phase Filter */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">Phase:</label>
+                  <select
+                    value={phaseFilter}
+                    onChange={(e) => setPhaseFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Phases</option>
+                    <option value="EARLY_PHASE_1">Early Phase 1</option>
+                    <option value="PHASE_1">Phase 1</option>
+                    <option value="PHASE_2">Phase 2</option>
+                    <option value="PHASE_3">Phase 3</option>
+                    <option value="PHASE_4">Phase 4</option>
+                    <option value="NOT_APPLICABLE">N/A</option>
+                  </select>
+                </div>
+                
+                {/* Status Filter */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">Status:</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Status</option>
+                    <option value="RECRUITING">Recruiting</option>
+                    <option value="NOT_YET_RECRUITING">Not Yet Recruiting</option>
+                    <option value="ACTIVE_NOT_RECRUITING">Active, Not Recruiting</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="SUSPENDED">Suspended</option>
+                    <option value="TERMINATED">Terminated</option>
+                    <option value="WITHDRAWN">Withdrawn</option>
+                  </select>
+                </div>
+                
+                {/* Source Filter */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Filter className="w-4 h-4" />
+                    Source:
+                  </label>
+                  <select
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={trialSource}
+                    onChange={(e) => setTrialSource(e.target.value)}
+                  >
+                    <option value="all">All Sources</option>
+                    <option value="internal">Curalink Only</option>
+                    <option value="clinicaltrials">ClinicalTrials.gov</option>
+                    <option value="pubmed">PubMed</option>
+                    <option value="arxiv">arXiv</option>
+                  </select>
+                </div>
+                
+                {/* Date Filter */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    Started:
+                  </label>
+                  <select
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                  >
+                    <option value="all">All Time</option>
+                    <option value="6">Last 6 Months</option>
+                    <option value="12">Last 1 Year</option>
+                    <option value="24">Last 2 Years</option>
+                    <option value="36">Last 3 Years</option>
+                  </select>
+                </div>
               </div>
             </div>
           )}
@@ -992,15 +1078,15 @@ export default function ResearcherDashboard() {
                 <div className="flex items-center gap-2">
                   <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                     <Filter className="w-4 h-4" />
-                    Sources:
+                    Publication Source:
                   </label>
                   <select
                     className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={publicationSources.length === 3 ? 'all' : publicationSources[0]}
+                    value={publicationSources.length === 4 ? 'all' : publicationSources[0]}
                     onChange={(e) => {
                       const value = e.target.value;
                       if (value === 'all') {
-                        setPublicationSources(['pubmed', 'arxiv', 'orcid']);
+                        setPublicationSources(['internal', 'pubmed', 'arxiv', 'orcid']);
                       } else {
                         setPublicationSources([value]);
                       }
@@ -1008,6 +1094,7 @@ export default function ResearcherDashboard() {
                     }}
                   >
                     <option value="all">All Sources</option>
+                    <option value="internal">Curalink Only</option>
                     <option value="pubmed">PubMed Only</option>
                     <option value="arxiv">arXiv Only</option>
                     <option value="orcid">ORCID Only</option>
@@ -1108,7 +1195,7 @@ export default function ResearcherDashboard() {
                 <div className="flex items-center gap-2">
                   <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                     <Filter className="w-4 h-4" />
-                    Sources:
+                    Researcher Source:
                   </label>
                   <select
                     className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1321,6 +1408,11 @@ export default function ResearcherDashboard() {
                   data={dashboardData} 
                   onSectionChange={setActiveSection}
                   user={user}
+                  toast={toast}
+                  onViewProfile={(researcher) => {
+                    setSelectedResearcher(researcher);
+                    setShowResearcherModal(true);
+                  }}
                 />
               )}
 
@@ -1331,6 +1423,11 @@ export default function ResearcherDashboard() {
                   onPageChange={(page) => {
                     setResearcherPage(page);
                     fetchResearchers(page);
+                  }}
+                  toast={toast}
+                  onViewProfile={(researcher) => {
+                    setSelectedResearcher(researcher);
+                    setShowResearcherModal(true);
                   }}
                 />
               )}
@@ -1343,11 +1440,12 @@ export default function ResearcherDashboard() {
                     setExpertPage(page);
                     fetchExperts(page);
                   }}
+                  toast={toast}
                 />
               )}
 
               {activeSection === 'collaborators' && (
-                <CollaboratorsContent collaborators={filteredCollaborators} />
+                <CollaboratorsContent collaborators={filteredCollaborators} toast={toast} />
               )}
 
               {activeSection === 'trials' && (
@@ -1396,12 +1494,28 @@ export default function ResearcherDashboard() {
           )}
         </div>
       </div>
+      
+      {/* Researcher Profile Modal */}
+      <ResearcherProfileModal
+        researcher={selectedResearcher}
+        isOpen={showResearcherModal}
+        onClose={() => {
+          setShowResearcherModal(false);
+          setSelectedResearcher(null);
+        }}
+        onConnect={(researcherId) => {
+          toast.success('Connection request sent!');
+        }}
+        onFollow={(researcherId) => {
+          toast.success('You are now following this researcher');
+        }}
+      />
     </div>
   );
 }
 
 // Dashboard Overview Component
-function DashboardContent({ data, onSectionChange }) {
+function DashboardContent({ data, onSectionChange, toast, onViewProfile }) {
   const [connecting, setConnecting] = useState({});
   const [following, setFollowing] = useState({});
   const router = useRouter();
@@ -1409,7 +1523,9 @@ function DashboardContent({ data, onSectionChange }) {
   if (!data) return null;
 
   const handleViewProfile = (researcher) => {
-    alert(`Viewing profile of ${researcher.name}\n\nEmail: ${researcher.email || 'N/A'}\nInstitution: ${researcher.affiliation || researcher.institution || 'N/A'}\nPublications: ${researcher.publicationCount || 0}`);
+    if (onViewProfile) {
+      onViewProfile(researcher);
+    }
   };
 
   const handleViewTrial = (trial) => {
@@ -1441,6 +1557,12 @@ function DashboardContent({ data, onSectionChange }) {
   };
 
   const handleConnect = async (researcherId) => {
+    // Check if this is an external researcher (ORCID IDs start with specific patterns)
+    if (!researcherId || researcherId.toString().includes('-') || researcherId.toString().startsWith('ORCID:')) {
+      toast.error('This researcher is not registered on the platform. You can only connect with registered researchers.');
+      return;
+    }
+    
     setConnecting(prev => ({ ...prev, [researcherId]: true }));
     try {
       const response = await fetch('/api/researcher/connect', {
@@ -1450,15 +1572,15 @@ function DashboardContent({ data, onSectionChange }) {
       });
 
       if (response.ok) {
-        alert('Connection request sent!');
+        toast.success('Connection request sent!');
         window.location.reload();
       } else {
         const errorData = await response.json();
-        alert(errorData.error || 'Failed to send connection request');
+        toast.error(errorData.error || 'Failed to send connection request');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error sending connection request');
+      toast.error('Error sending connection request');
     } finally {
       setConnecting(prev => ({ ...prev, [researcherId]: false }));
     }
@@ -1481,11 +1603,11 @@ function DashboardContent({ data, onSectionChange }) {
         throw new Error(data.error || 'Failed to follow researcher');
       }
 
-      alert('Successfully followed researcher!');
+      toast.success('Successfully followed researcher!');
       window.location.reload();
     } catch (error) {
       console.error('Error following researcher:', error);
-      alert(error.message || 'Error following researcher');
+      toast.error(error.message || 'Error following researcher');
       setFollowing(prev => ({ ...prev, [researcherId]: false }));
     }
   };
@@ -1734,13 +1856,19 @@ function DashboardContent({ data, onSectionChange }) {
 }
 
 // Researchers Content Component
-function ResearchersContent({ researchers, pagination, onPageChange }) {
+function ResearchersContent({ researchers, pagination, onPageChange, toast, onViewProfile }) {
   const [connecting, setConnecting] = useState({});
   const [following, setFollowing] = useState({});
   const [accepting, setAccepting] = useState({});
   const router = useRouter();
 
   const handleConnect = async (researcherId) => {
+    // Check if this is an external researcher
+    if (!researcherId || researcherId.toString().includes('-') || researcherId.toString().startsWith('ORCID:')) {
+      toast.error('This researcher is not registered on the platform. You can only connect with registered researchers.');
+      return;
+    }
+    
     setConnecting(prev => ({ ...prev, [researcherId]: true }));
     try {
       const response = await fetch('/api/researcher/connect', {
@@ -1750,15 +1878,15 @@ function ResearchersContent({ researchers, pagination, onPageChange }) {
       });
 
       if (response.ok) {
-        alert('Connection request sent!');
+        toast.success('Connection request sent!');
         window.location.reload();
       } else {
         const errorData = await response.json();
-        alert(errorData.error || 'Failed to send connection request');
+        toast.error(errorData.error || 'Failed to send connection request');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error sending connection request');
+      toast.error('Error sending connection request');
     } finally {
       setConnecting(prev => ({ ...prev, [researcherId]: false }));
     }
@@ -1823,8 +1951,8 @@ function ResearchersContent({ researchers, pagination, onPageChange }) {
   };
 
   const handleViewProfile = (researcher) => {
-    // TODO: Navigate to researcher profile or open modal
-    alert(`Viewing profile of ${researcher.name}\n\nEmail: ${researcher.email}\nInstitution: ${researcher.affiliation || researcher.institution || 'N/A'}\nPublications: ${researcher.publicationCount || 0}`);
+    setSelectedResearcher(researcher);
+    setShowResearcherModal(true);
   };
 
   if (researchers.length === 0) {
@@ -2048,10 +2176,16 @@ function ResearchersContent({ researchers, pagination, onPageChange }) {
 }
 
 // Experts Content Component  
-function ExpertsContent({ experts, pagination, onPageChange }) {
+function ExpertsContent({ experts, pagination, onPageChange, toast }) {
   const [connecting, setConnecting] = useState({});
 
   const handleConnect = useCallback(async (expertId) => {
+    // Check if this is an external researcher
+    if (!expertId || expertId.toString().includes('-') || expertId.toString().startsWith('ORCID:')) {
+      toast.error('This researcher is not registered on the platform. You can only connect with registered researchers.');
+      return;
+    }
+    
     setConnecting(prev => ({ ...prev, [expertId]: true }));
     try {
       const response = await fetch('/api/researcher/connect', {
@@ -2061,18 +2195,18 @@ function ExpertsContent({ experts, pagination, onPageChange }) {
       });
 
       if (response.ok) {
-        alert('Connection request sent!');
+        toast.success('Connection request sent!');
       } else {
         const errorData = await response.json();
-        alert(errorData.error || 'Failed to send connection request');
+        toast.error(errorData.error || 'Failed to send connection request');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error sending connection request');
+      toast.error('Error sending connection request');
     } finally {
       setConnecting(prev => ({ ...prev, [expertId]: false }));
     }
-  }, []);
+  }, [toast]);
 
   if (experts.length === 0) {
     return (
@@ -2218,12 +2352,18 @@ function ExpertsContent({ experts, pagination, onPageChange }) {
 }
 
 // Collaborators Content Component
-function CollaboratorsContent({ collaborators }) {
+function CollaboratorsContent({ collaborators, toast }) {
   const [connecting, setConnecting] = useState({});
   const [accepting, setAccepting] = useState({});
   const router = useRouter();
 
   const handleConnect = useCallback(async (collaboratorId) => {
+    // Check if this is an external researcher
+    if (!collaboratorId || collaboratorId.toString().includes('-') || collaboratorId.toString().startsWith('ORCID:')) {
+      toast.error('This researcher is not registered on the platform. You can only connect with registered researchers.');
+      return;
+    }
+    
     setConnecting(prev => ({ ...prev, [collaboratorId]: true }));
     try {
       const response = await fetch('/api/researcher/connect', {
@@ -2233,19 +2373,19 @@ function CollaboratorsContent({ collaborators }) {
       });
 
       if (response.ok) {
-        alert('Connection request sent!');
+        toast.success('Connection request sent!');
         window.location.reload();
       } else {
         const errorData = await response.json();
-        alert(errorData.error || 'Failed to send connection request');
+        toast.error(errorData.error || 'Failed to send connection request');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error sending connection request');
+      toast.error('Error sending connection request');
     } finally {
       setConnecting(prev => ({ ...prev, [collaboratorId]: false }));
     }
-  }, []);
+  }, [toast]);
 
   const handleAccept = useCallback(async (connectionId, collaboratorName) => {
     setAccepting(prev => ({ ...prev, [connectionId]: true }));
@@ -3138,10 +3278,13 @@ function PublicationCard({ publication, index, isUserPub, toggleFavorite, isFavo
       <p className="text-sm text-gray-600 mb-3">
         {publication.journal} • {publication.publishedDate ? new Date(publication.publishedDate).toLocaleDateString() : publication.year || 'Date not available'}
       </p>
-      {publication.authors && publication.authors.length > 0 && (
+      {publication.authors && (
         <p className="text-xs text-gray-500 mb-2">
-          Authors: {publication.authors.slice(0, 3).map(a => a.name).join(', ')}
-          {publication.authors.length > 3 && ` +${publication.authors.length - 3} more`}
+          Authors: {typeof publication.authors === 'string' 
+            ? publication.authors 
+            : Array.isArray(publication.authors) 
+              ? publication.authors.slice(0, 3).map(a => typeof a === 'string' ? a : (a.name || 'Unknown')).join(', ') + (publication.authors.length > 3 ? ` +${publication.authors.length - 3} more` : '')
+              : 'Unknown'}
         </p>
       )}
       {publication.abstract && (
