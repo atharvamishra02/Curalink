@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
 import jwt from 'jsonwebtoken';
+import { uploadToCloudinary } from '@/lib/cloudinary';
 
 export async function POST(request) {
   try {
@@ -44,34 +42,25 @@ export async function POST(request) {
       );
     }
 
-    // Create uploads directory if it doesn't exist
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'avatars');
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
-
-    // Generate unique filename
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.name);
-    const filename = `avatar-${decoded.userId}-${uniqueSuffix}${ext}`;
-    const filepath = path.join(uploadDir, filename);
-
-    // Convert file to buffer and save
+    // Convert file to buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    await writeFile(filepath, buffer);
 
-    // Return the public URL
-    const avatarUrl = `/uploads/avatars/${filename}`;
+    // Upload to Cloudinary
+    const publicId = `user-${decoded.userId}-${Date.now()}`;
+    const result = await uploadToCloudinary(buffer, 'avatars', publicId);
+
+    console.log('✅ Avatar uploaded to Cloudinary:', result.url);
 
     return NextResponse.json({
       success: true,
-      avatarUrl,
+      avatarUrl: result.url,
+      publicId: result.publicId,
       message: 'Avatar uploaded successfully'
     });
 
   } catch (error) {
-    console.error('Error uploading avatar:', error);
+    console.error('❌ Error uploading avatar:', error);
     return NextResponse.json(
       { error: 'Failed to upload avatar', details: error.message },
       { status: 500 }

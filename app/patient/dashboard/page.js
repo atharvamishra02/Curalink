@@ -1014,7 +1014,7 @@ export default function PatientDashboard() {
 
             {/* Profile Section */}
             {activeSection === 'profile' && user && (
-              <ProfileContent user={user} onUpdate={fetchUserData} />
+              <ProfileContent user={user} onUpdate={fetchUserData} toast={toast} />
             )}
           </motion.div>
         )}
@@ -2347,7 +2347,7 @@ function FavoritesContent({ favorites, onRefresh }) {
   );
 }
 
-function ProfileContent({ user, onUpdate }) {
+function ProfileContent({ user, onUpdate, toast }) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     name: user.name || '',
@@ -2369,13 +2369,13 @@ function ProfileContent({ user, onUpdate }) {
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      toast.error({ title: 'Invalid File Type', description: 'Only JPEG, PNG, GIF, and WebP images are allowed.' });
+      toast.error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.');
       return;
     }
 
     // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error({ title: 'File Too Large', description: 'Maximum size is 5MB.' });
+      toast.error('File too large. Maximum size is 5MB.');
       return;
     }
 
@@ -2400,15 +2400,15 @@ function ProfileContent({ user, onUpdate }) {
       if (response.ok) {
         const data = await response.json();
         setFormData({ ...formData, avatar: data.avatarUrl });
-        toast.success({ title: 'Avatar Uploaded', description: 'Profile picture uploaded successfully' });
+        toast.success('Avatar uploaded successfully!');
       } else {
         const error = await response.json();
-        toast.error({ title: 'Upload Failed', description: error.error || 'Failed to upload avatar' });
+        toast.error(error.error || 'Failed to upload avatar');
         setAvatarPreview(formData.avatar);
       }
     } catch (error) {
       console.error('Error uploading avatar:', error);
-      toast.error({ title: 'Error', description: 'Failed to upload avatar' });
+      toast.error('Error uploading avatar');
       setAvatarPreview(formData.avatar);
     } finally {
       setUploading(false);
