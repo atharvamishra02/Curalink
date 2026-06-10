@@ -228,8 +228,13 @@ body {
 .dark input, 
 .dark select, 
 .dark textarea {
-  background-color: rgba(255, 255, 255, 0.02) !important;
-  border-color: rgba(255, 255, 255, 0.06) !important;
+  background-color: #0c0a25 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+}
+
+.dark select option {
+  background-color: #0b0826 !important;
   color: #f8fafc !important;
 }
 
