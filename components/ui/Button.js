@@ -21,9 +21,9 @@ export function Button({
   const variantStyles = useMemo(() => {
     const styles = {
       primary: 'bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white hover:opacity-95 focus:ring-indigo-500 shadow-md hover:shadow-lg hover:shadow-indigo-500/25',
-      secondary: 'bg-slate-100 text-slate-800 hover:bg-slate-200/80 border border-slate-200/60 focus:ring-slate-400',
-      outline: 'bg-transparent border border-indigo-600/80 text-indigo-600 hover:bg-indigo-50/50 focus:ring-indigo-500',
-      ghost: 'bg-transparent text-slate-600 hover:bg-slate-100 focus:ring-slate-400',
+      secondary: 'bg-slate-100 dark:bg-slate-800/60 text-slate-800 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-700 border border-slate-200/60 dark:border-slate-700/50 focus:ring-slate-400',
+      outline: 'bg-transparent border border-indigo-600/80 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 focus:ring-indigo-500',
+      ghost: 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/50 focus:ring-slate-400',
       danger: 'bg-rose-500 text-white hover:bg-rose-600 focus:ring-rose-400 shadow-sm',
     };
     return styles[variant] || styles.primary;

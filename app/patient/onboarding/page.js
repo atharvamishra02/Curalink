@@ -113,18 +113,18 @@ export default function PatientOnboarding() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Header */}
-      <header className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-gray-100">
+      <header className="fixed top-0 w-full bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-50 border-b border-gray-100 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <button
             onClick={() => router.push('/')}
-            className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+            className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 dark:text-slate-300 dark:hover:text-white transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
             <span>Back</span>
           </button>
           <div className="flex items-center space-x-2">
             <Stethoscope className="w-6 h-6 text-blue-600" />
-            <span className="text-xl font-bold">CuraLink</span>
+            <span className="text-xl font-bold text-gray-900 dark:text-white">CuraLink</span>
           </div>
         </div>
       </header>
@@ -257,8 +257,8 @@ export default function PatientOnboarding() {
                             className={`
                               px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all
                               ${formData.conditions.includes(condition)
-                                ? 'border-blue-600 bg-blue-50 text-blue-700'
-                                : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                                ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300'
+                                : 'border-gray-200 dark:border-slate-800 hover:border-gray-300 dark:hover:border-slate-700 text-gray-700 dark:text-slate-300'
                               }
                             `}
                           >
