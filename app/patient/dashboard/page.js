@@ -1080,7 +1080,7 @@ function DashboardContent({ data, onSectionChange, onViewProfile }) {
             <Button
               variant="secondary"
               onClick={() => onSectionChange('trials')}
-              className="bg-slate-100 text-slate-700 hover:bg-slate-200/80 px-5 py-3 rounded-xl border border-slate-200/50 text-sm w-full sm:w-auto"
+              className="bg-slate-100 dark:bg-slate-800/50 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-700/85 border border-slate-200/50 dark:border-slate-700/50 px-5 py-3 rounded-xl text-sm w-full sm:w-auto transition-colors duration-300"
             >
               Explore Clinical Trials
             </Button>
