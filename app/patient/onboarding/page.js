@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Heart, MapPin, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Stethoscope, MapPin, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -123,7 +123,7 @@ export default function PatientOnboarding() {
             <span>Back</span>
           </button>
           <div className="flex items-center space-x-2">
-            <Heart className="w-6 h-6 text-blue-600" />
+            <Stethoscope className="w-6 h-6 text-blue-600" />
             <span className="text-xl font-bold">CuraLink</span>
           </div>
         </div>

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -41,6 +41,24 @@ export default function ResearcherDashboard() {
   const toast = useToast();
   const [user, setUser] = useState(null);
   const [activeSection, setActiveSection] = useState('dashboard');
+  
+  // Persist active section across reloads
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedSection = localStorage.getItem('researcherActiveSection');
+      if (savedSection) {
+        setActiveSection(savedSection);
+      }
+    }
+  }, []);
+
+  const handleSectionChange = (section) => {
+    setActiveSection(section);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('researcherActiveSection', section);
+    }
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [loading, setLoading] = useState(false);
@@ -917,7 +935,7 @@ export default function ResearcherDashboard() {
     <div className="min-h-screen bg-gray-50">
       <HamburgerMenu 
         activeSection={activeSection}
-        onSectionChange={setActiveSection}
+        onSectionChange={handleSectionChange}
         user={user}
         onLogout={handleLogout}
         isResearcher={true}
@@ -1406,7 +1424,7 @@ export default function ResearcherDashboard() {
               {activeSection === 'dashboard' && (
                 <DashboardContent 
                   data={dashboardData} 
-                  onSectionChange={setActiveSection}
+                  onSectionChange={handleSectionChange}
                   user={user}
                   toast={toast}
                   onViewProfile={(researcher) => {
@@ -1648,6 +1666,13 @@ function DashboardContent({ data, onSectionChange, toast, onViewProfile }) {
   const allPublications = [...(data.publications || []), ...(data.externalPublications || [])].slice(0, 6);
   const displayResearchers = (data.researchers || []).slice(0, 6);
 
+  const colorMap = {
+    blue: { text: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-100' },
+    green: { text: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-100' },
+    purple: { text: 'text-purple-600', bg: 'bg-purple-50 border-purple-100' },
+    orange: { text: 'text-pink-600', bg: 'bg-pink-50 border-pink-100' }
+  };
+
   return (
     <div className="space-y-8">
       {/* Stats Grid */}
@@ -1655,12 +1680,16 @@ function DashboardContent({ data, onSectionChange, toast, onViewProfile }) {
         {stats.map((stat, index) => (
           <Card 
             key={index}
-            className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
+            className="p-6 cursor-pointer hover:shadow-lg transition-shadow border border-slate-200/60"
             onClick={stat.action}
           >
-            <div className={`text-${stat.color}-600 mb-3`}>{stat.icon}</div>
-            <div className="text-3xl font-bold mb-1">{stat.value}</div>
-            <div className="text-gray-600 text-sm">{stat.label}</div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider">{stat.label}</span>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${colorMap[stat.color].bg} ${colorMap[stat.color].text}`}>
+                {stat.icon}
+              </div>
+            </div>
+            <div className="text-4xl font-extrabold text-slate-800 mt-4 tracking-tight">{stat.value}</div>
           </Card>
         ))}
       </div>
@@ -1951,8 +1980,9 @@ function ResearchersContent({ researchers, pagination, onPageChange, toast, onVi
   };
 
   const handleViewProfile = (researcher) => {
-    setSelectedResearcher(researcher);
-    setShowResearcherModal(true);
+    if (onViewProfile) {
+      onViewProfile(researcher);
+    }
   };
 
   if (researchers.length === 0) {

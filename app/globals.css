@@ -1,22 +1,313 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fafbfc;
-  --foreground: #1a202c;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  
+  --color-primary: #6366f1;
+  --color-secondary: #a855f7;
+  --color-accent: #f43f5e;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-geist-sans), Inter, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: radial-gradient(circle at top, #f1f5f9 0%, #cbd5e1 100%);
   background-attachment: fixed;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
   min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.6);
+}
+
+/* Premium Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05),
+              0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(99, 102, 241, 0.2);
+  box-shadow: 0 20px 40px -15px rgba(99, 102, 241, 0.1),
+              0 1px 5px rgba(99, 102, 241, 0.05);
+  transform: translateY(-2px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Glowing Spotlights (Soft) */
+.glowing-spotlight {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.25;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.spotlight-indigo {
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, transparent 70%);
+}
+
+.spotlight-purple {
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.4) 0%, transparent 70%);
+}
+
+.spotlight-rose {
+  background: radial-gradient(circle, rgba(244, 63, 94, 0.3) 0%, transparent 70%);
+}
+
+/* Animations */
+@keyframes float {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(0.5deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float-delayed {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(8px) rotate(-0.5deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+.animate-float-delayed {
+  animation: float-delayed 7s ease-in-out infinite;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #f43f5e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ==========================================
+   DARK THEME SYSTEM
+   ========================================== */
+
+:root.dark {
+  --background: #030014;
+  --foreground: #f8fafc;
+}
+
+.dark body {
+  background: radial-gradient(circle at top, #0c0a25 0%, #030014 100%) !important;
+  color: #f8fafc !important;
+}
+
+/* Frosted glass cards */
+.dark .glass-panel {
+  background: rgba(13, 10, 37, 0.45) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark .glass-panel-hover:hover {
+  background: rgba(13, 10, 37, 0.6) !important;
+  border-color: rgba(99, 102, 241, 0.25) !important;
+  box-shadow: 0 20px 45px -15px rgba(99, 102, 241, 0.2), 0 1px 5px rgba(99, 102, 241, 0.1) !important;
+}
+
+/* Dashboard card layouts */
+.dark .bg-white {
+  background-color: rgba(13, 10, 37, 0.45) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.dark .bg-white\/95 {
+  background-color: rgba(13, 10, 37, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark .bg-slate-50, 
+.dark .bg-gray-50, 
+.dark .bg-blue-50, 
+.dark .bg-purple-50,
+.dark .bg-indigo-50\/40 {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Border overrides */
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-200\/60,
+.dark .border-slate-200\/80 {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Text overrides */
+.dark .text-slate-800,
+.dark .text-gray-800,
+.dark .text-gray-900,
+.dark .text-slate-900,
+.dark .text-gray-800.truncate,
+.dark h2.text-gray-800,
+.dark h3.text-gray-800,
+.dark span.text-gray-800 {
+  color: #f8fafc !important;
+}
+
+.dark .text-slate-600,
+.dark .text-gray-600,
+.dark .text-gray-700,
+.dark .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-500,
+.dark .text-gray-500,
+.dark .text-gray-400 {
+  color: #94a3b8 !important;
+}
+
+/* Modals and popovers */
+.dark .fixed.inset-0.bg-black.bg-opacity-20,
+.dark .fixed.inset-0.bg-black.bg-opacity-30 {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+.dark .bg-white.rounded-lg,
+.dark .bg-white.rounded-xl,
+.dark .bg-white.rounded-2xl {
+  background-color: #0b0826 !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.dark .bg-gradient-to-r.from-slate-50.to-indigo-50\/40 {
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.02), rgba(99, 102, 241, 0.05)) !important;
+}
+
+.dark .divide-y.divide-gray-100 > * {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark .divide-y.divide-gray-200 > * {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark .border-b.border-slate-100 {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Inputs, textareas, and select components */
+.dark input, 
+.dark select, 
+.dark textarea {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  color: #f8fafc !important;
+}
+
+.dark input:focus, 
+.dark select:focus, 
+.dark textarea:focus {
+  border-color: rgba(99, 102, 241, 0.5) !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25) !important;
+}
+
+.dark input::placeholder, 
+.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* List buttons & nav items */
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-white:hover {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.dark .bg-gray-100 {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark .group:hover .group-hover\:bg-gray-200 {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Status and categories badges in Dark Mode */
+.dark .bg-green-100 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  color: #34d399 !important;
+}
+.dark .bg-blue-100 {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  color: #60a5fa !important;
+}
+.dark .bg-yellow-100 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+  color: #fbbf24 !important;
+}
+.dark .bg-purple-100 {
+  background-color: rgba(139, 92, 246, 0.15) !important;
+  color: #c084fc !important;
+}
+.dark .bg-indigo-100 {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  color: #818cf8 !important;
+}
+.dark .bg-rose-100 {
+  background-color: rgba(244, 63, 94, 0.15) !important;
+  color: #fb7185 !important;
+}
+.dark .bg-pink-100 {
+  background-color: rgba(236, 72, 153, 0.15) !important;
+  color: #f472b6 !important;
+}
+.dark .bg-red-100 {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  color: #f87171 !important;
+}
+.dark .bg-orange-100 {
+  background-color: rgba(249, 115, 22, 0.15) !important;
+  color: #ffedd5 !important;
+}
+.dark .bg-cyan-100 {
+  background-color: rgba(6, 182, 212, 0.15) !important;
+  color: #22d3ee !important;
+}
+
+/* Sidebar Drawer solid backgrounds to prevent transparency overlapping */
+.sidebar-drawer {
+  background-color: #ffffff !important;
+}
+.dark .sidebar-drawer {
+  background-color: #0b0826 !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 

@@ -44,6 +44,23 @@ export default function PatientDashboard() {
   const [user, setUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSection, setActiveSection] = useState('dashboard');
+  
+  // Persist active section across reloads
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedSection = localStorage.getItem('patientActiveSection');
+      if (savedSection) {
+        setActiveSection(savedSection);
+      }
+    }
+  }, []);
+
+  const handleSectionChange = (section) => {
+    setActiveSection(section);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('patientActiveSection', section);
+    }
+  };
   const [locationFilter, setLocationFilter] = useState('');
   const [conditionFilters, setConditionFilters] = useState([]);
   const [phaseFilter, setPhaseFilter] = useState('');
@@ -604,7 +621,7 @@ export default function PatientDashboard() {
       {/* Hamburger Menu */}
       <HamburgerMenu 
         activeSection={activeSection}
-        onSectionChange={setActiveSection}
+        onSectionChange={handleSectionChange}
         user={user}
         onLogout={handleLogout}
       />
@@ -959,7 +976,7 @@ export default function PatientDashboard() {
             {activeSection === 'dashboard' && dashboardData && (
               <DashboardContent 
                 data={dashboardData} 
-                onSectionChange={setActiveSection}
+                onSectionChange={handleSectionChange}
                 onViewProfile={(researcher) => {
                   setSelectedResearcher(researcher);
                   setShowResearcherModal(true);
@@ -995,7 +1012,7 @@ export default function PatientDashboard() {
 
             {/* Forums Section */}
             {activeSection === 'forums' && (
-              <ForumsContent forums={forums} currentUser={user} />
+              <ForumsContent forums={forums} currentUser={user} onRefresh={fetchForums} />
             )}
 
             {/* Favorites Section */}
@@ -1025,99 +1042,139 @@ export default function PatientDashboard() {
 
 // Dashboard Content Component
 function DashboardContent({ data, onSectionChange, onViewProfile }) {
+  // Calculate total matches for display
+  const trialCount = data.trials?.length || 0;
+  const researcherCount = data.researchers?.length || 0;
+  const publicationCount = data.publications?.length || 0;
+
   return (
-    <div className="space-y-8">
-      {/* Find Experts CTA */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg"
-      >
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h3 className="text-xl sm:text-2xl font-bold mb-2">Find Expert Doctors Near You</h3>
-            <p className="text-blue-100 text-sm sm:text-base">
-              Connect with specialists who match your conditions and are closest to your location
+    <div className="space-y-10">
+      {/* Welcome & Overview Header */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/60 shadow-sm relative overflow-hidden">
+        {/* Soft backdrop decorations */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/4 w-48 h-48 bg-purple-500/5 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-semibold border border-indigo-100">
+              <Sparkles className="w-3.5 h-3.5" />
+              AI Match Engine Active
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
+              Personalized Health Overview
+            </h2>
+            <p className="text-slate-500 text-sm max-w-xl font-light">
+              We've analyzed your medical conditions and location to map out active clinical trials, verified specialists, and journals.
             </p>
           </div>
-          <Button
-            onClick={() => onSectionChange('experts')}
-            className="bg-white text-blue-600 hover:bg-blue-50 font-semibold px-4 sm:px-6 py-2 sm:py-3 shadow-md w-full sm:w-auto"
-          >
-            <Users className="w-5 h-5 mr-2" />
-            Find Experts
-          </Button>
+
+          <div className="flex flex-wrap sm:flex-nowrap gap-4">
+            <Button
+              onClick={() => onSectionChange('experts')}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-3 rounded-xl shadow-md shadow-indigo-500/10 text-sm w-full sm:w-auto"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Find Expert Doctors
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => onSectionChange('trials')}
+              className="bg-slate-100 text-slate-700 hover:bg-slate-200/80 px-5 py-3 rounded-xl border border-slate-200/50 text-sm w-full sm:w-auto"
+            >
+              Explore Clinical Trials
+            </Button>
+          </div>
         </div>
-      </motion.div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-3 gap-4 mt-8 pt-8 border-t border-slate-100">
+          {[
+            { label: 'Trial Matches', value: trialCount, color: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
+            { label: 'Local Specialists', value: researcherCount, color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+            { label: 'Related Publications', value: publicationCount, color: 'text-purple-600 bg-purple-50 border-purple-100' }
+          ].map((stat, idx) => (
+            <div key={idx} className="flex flex-col sm:flex-row items-center sm:items-start gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg sm:text-xl shrink-0 ${stat.color}`}>
+                {stat.value}
+              </div>
+              <div className="text-center sm:text-left">
+                <div className="text-xs font-semibold text-slate-700">{stat.label}</div>
+                <div className="text-[10px] text-slate-400 font-light mt-0.5 sm:block hidden">Automatically matched</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Experts Section */}
-      <div>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <Users className="w-5 sm:w-6 h-5 sm:h-6 text-blue-600" />
-            Recommended Researchers
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+            <Users className="w-5 h-5 text-indigo-600" />
+            Recommended Specialists
           </h2>
-          <Button variant="outline" onClick={() => onSectionChange('researchers')} className="w-full sm:w-auto">
+          <Button variant="ghost" size="sm" onClick={() => onSectionChange('researchers')} className="text-indigo-600 hover:text-indigo-700 text-xs sm:text-sm font-semibold">
             View All
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {data.researchers?.slice(0, 3).map((researcher) => (
             <ResearcherCard key={researcher.id} researcher={researcher} onViewProfile={onViewProfile} />
           ))}
         </div>
         {(!data.researchers || data.researchers.length === 0) && (
-          <Card className="p-6 sm:p-8 text-center">
-            <Users className="w-10 sm:w-12 h-10 sm:h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm sm:text-base text-gray-500">No researchers found. Try adjusting your conditions.</p>
+          <Card className="p-8 text-center border-dashed">
+            <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-sm text-slate-500 font-light">No researchers matched. Try adjusting your condition filters above.</p>
           </Card>
         )}
       </div>
 
       {/* Clinical Trials Section */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <TrendingUp className="w-6 h-6 text-green-600" />
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-emerald-600" />
             Clinical Trials
           </h2>
-          <Button variant="outline" onClick={() => onSectionChange('trials')}>
+          <Button variant="ghost" size="sm" onClick={() => onSectionChange('trials')} className="text-indigo-600 hover:text-indigo-700 text-xs sm:text-sm font-semibold">
             View All
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {data.trials.slice(0, 4).map((trial, idx) => (
             <TrialCard key={trial.id || `trial-${idx}-${trial.title}`} trial={trial} />
           ))}
         </div>
         {data.trials.length === 0 && (
-          <Card className="p-8 text-center">
-            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">No trials found. Try searching for a condition.</p>
+          <Card className="p-8 text-center border-dashed">
+            <FileText className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-sm text-slate-500 font-light">No clinical trials found. Try adding general condition filters.</p>
           </Card>
         )}
       </div>
 
       {/* Publications Section */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <BookOpen className="w-6 h-6 text-purple-600" />
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-purple-600" />
             Latest Publications
           </h2>
-          <Button variant="outline" onClick={() => onSectionChange('publications')}>
+          <Button variant="ghost" size="sm" onClick={() => onSectionChange('publications')} className="text-indigo-600 hover:text-indigo-700 text-xs sm:text-sm font-semibold">
             View All
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {data.publications.slice(0, 3).map((pub, idx) => (
             <PublicationCard key={pub.id || `pub-${idx}-${pub.title?.substring(0, 20)}`} publication={pub} />
           ))}
         </div>
         {data.publications.length === 0 && (
-          <Card className="p-8 text-center">
-            <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">No publications found.</p>
+          <Card className="p-8 text-center border-dashed">
+            <BookOpen className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-sm text-slate-500 font-light">No scientific publications found.</p>
           </Card>
         )}
       </div>
@@ -1423,6 +1480,7 @@ function ResearcherCard({ researcher, onFavoriteChange, onViewProfile }) {
 
 // Trial Card Component
 function TrialCard({ trial, onFavoriteChange }) {
+  const toast = useToast();
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showAiSummary, setShowAiSummary] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
@@ -1941,7 +1999,8 @@ function PublicationsContent({ publications, onRefresh }) {
   );
 }
 
-function ForumsContent({ forums, currentUser }) {
+function ForumsContent({ forums, currentUser, onRefresh }) {
+  const toast = useToast();
   const [filteredForums, setFilteredForums] = useState(forums);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -1986,7 +2045,7 @@ function ForumsContent({ forums, currentUser }) {
         toast.success({ title: 'Post Created!', description: 'Researchers will answer soon.' });
         setShowCreatePost(false);
         setNewPost({ title: '', content: '', category: 'general' });
-        fetchForums(); // Refresh forums instead of page reload
+        onRefresh?.(); // Refresh forums instead of page reload
       } else {
         toast.error({ title: 'Failed', description: 'Could not create post' });
       }
@@ -2009,7 +2068,7 @@ function ForumsContent({ forums, currentUser }) {
 
       if (response.ok) {
         toast.success({ title: 'Post Deleted', description: 'Post deleted successfully' });
-        fetchForums(); // Refresh forums instead of page reload
+        onRefresh?.(); // Refresh forums instead of page reload
       } else {
         toast.error({ title: 'Failed', description: 'Could not delete post' });
       }

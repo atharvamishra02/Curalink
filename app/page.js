@@ -6,59 +6,67 @@ import {
   Heart, Users, FlaskConical, ArrowRight, Sparkles, 
   Search, BookOpen, MessageSquare, Bell, Video, 
   TrendingUp, Shield, Zap, Globe, Award, CheckCircle,
-  FileText, Database, Brain, UserCheck
+  FileText, Database, Brain, UserCheck, Stethoscope
 } from 'lucide-react';
 import { useState } from 'react';
 
 export default function LandingPage() {
   const router = useRouter();
-  const [activeFeature, setActiveFeature] = useState(0);
 
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.2,
-        delayChildren: 0.3,
+        staggerChildren: 0.15,
+        delayChildren: 0.2,
       },
     },
   };
 
   const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
+    hidden: { y: 25, opacity: 0 },
     visible: {
       y: 0,
       opacity: 1,
       transition: {
         type: 'spring',
         stiffness: 100,
+        damping: 15
       },
     },
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-[#030014] text-slate-100 relative overflow-hidden font-sans selection:bg-indigo-500/30 selection:text-white">
+      {/* Background spotlights */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-indigo-500/10 blur-[120px] pointer-events-none -z-10 animate-pulse" />
+      <div className="absolute top-[20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-purple-500/10 blur-[130px] pointer-events-none -z-10" />
+      <div className="absolute bottom-[-10%] left-[20%] w-[50vw] h-[50vw] rounded-full bg-pink-500/10 blur-[120px] pointer-events-none -z-10" />
+
+      {/* Grid Pattern overlay */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none -z-10" />
+
       {/* Header */}
       <motion.header 
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        transition={{ type: 'spring', stiffness: 100 }}
-        className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-gray-100"
+        initial={{ y: -80, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+        className="fixed top-0 w-full bg-[#030014]/65 backdrop-blur-xl z-50 border-b border-white/5"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
-              <Heart className="w-6 h-6 text-white" />
+          <div className="flex items-center space-x-2 cursor-pointer" onClick={() => router.push('/')}>
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <Stethoscope className="w-5 h-5 text-white" />
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <span className="text-2xl font-bold bg-gradient-to-r from-white via-indigo-200 to-purple-400 bg-clip-text text-transparent tracking-tight">
               CuraLink
             </span>
           </div>
-          <div className="flex items-center space-x-3">
+          <div>
             <button 
               onClick={() => router.push('/login')}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+              className="px-5 py-2 text-sm font-medium text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all duration-300 backdrop-blur-sm"
             >
               Sign In
             </button>
@@ -67,7 +75,7 @@ export default function LandingPage() {
       </motion.header>
 
       {/* Hero Section */}
-      <main className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+      <main className="pt-32 pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -75,390 +83,293 @@ export default function LandingPage() {
           className="max-w-6xl mx-auto"
         >
           {/* Main Heading */}
-          <motion.div variants={itemVariants} className="text-center mb-12">
-            <div className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-50 rounded-full mb-6">
-              <Sparkles className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-medium text-blue-600">AI-Powered Healthcare Platform</span>
+          <motion.div variants={itemVariants} className="text-center mb-16">
+            <div className="inline-flex items-center space-x-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full mb-8 animate-float">
+              <Sparkles className="w-4 h-4 text-indigo-400" />
+              <span className="text-sm font-medium text-indigo-300">AI-Powered Healthcare Ecosystem</span>
             </div>
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+            <h1 className="text-5xl sm:text-7xl lg:text-8xl font-extrabold tracking-tight text-white mb-8 leading-[1.05]">
               Connect. Discover.
               <br />
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                 Transform Healthcare
               </span>
             </h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-lg sm:text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed font-light">
               CuraLink bridges the gap between patients and researchers, making it easier to discover 
               clinical trials, medical publications, and health experts tailored to your needs.
             </p>
           </motion.div>
 
           {/* CTA Cards */}
-          <motion.div variants={itemVariants} className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <motion.div variants={itemVariants} className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-28">
             {/* Patient Card */}
             <motion.div
-              whileHover={{ scale: 1.02, y: -5 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ y: -6, scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
               className="group cursor-pointer"
               onClick={() => router.push('/patient/onboarding')}
             >
-              <div className="relative h-full bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400 to-blue-600 rounded-bl-full opacity-10 group-hover:opacity-20 transition-opacity" />
+              <div className="relative h-full bg-white/[0.02] hover:bg-white/[0.04] rounded-3xl p-8 border border-white/5 hover:border-indigo-500/30 transition-all duration-300 shadow-2xl backdrop-blur-md overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-bl-full filter blur-md opacity-20 group-hover:opacity-40 transition-opacity" />
                 
-                <div className="p-8 relative z-10">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                    <Heart className="w-8 h-8 text-white" />
-                  </div>
-                  
-                  <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                    I&apos;m a Patient or Caregiver
-                  </h2>
-                  
-                  <p className="text-gray-600 mb-6 leading-relaxed">
-                    Find relevant clinical trials, connect with health experts, and discover the latest medical research personalized to your condition.
-                  </p>
-                  
-                  <div className="flex items-center text-blue-600 font-semibold group-hover:translate-x-2 transition-transform">
-                    Get Started
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </div>
+                <div className="w-14 h-14 bg-indigo-500/10 group-hover:bg-indigo-500/20 border border-indigo-500/20 rounded-2xl flex items-center justify-center mb-6 transition-all duration-300">
+                  <Heart className="w-6 h-6 text-indigo-400" />
+                </div>
+                
+                <h2 className="text-2xl font-bold text-white mb-3 tracking-tight">
+                  I&apos;m a Patient or Caregiver
+                </h2>
+                
+                <p className="text-slate-400 mb-8 leading-relaxed font-light text-sm sm:text-base">
+                  Find relevant clinical trials, connect with health experts, and discover the latest medical research personalized to your condition.
+                </p>
+                
+                <div className="flex items-center text-indigo-400 font-semibold group-hover:text-indigo-300 transition-colors">
+                  <span>Get Started</span>
+                  <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1.5 transition-transform" />
                 </div>
               </div>
             </motion.div>
 
             {/* Researcher Card */}
             <motion.div
-              whileHover={{ scale: 1.02, y: -5 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ y: -6, scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
               className="group cursor-pointer"
               onClick={() => router.push('/researcher/onboarding')}
             >
-              <div className="relative h-full bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-400 to-purple-600 rounded-bl-full opacity-10 group-hover:opacity-20 transition-opacity" />
+              <div className="relative h-full bg-white/[0.02] hover:bg-white/[0.04] rounded-3xl p-8 border border-white/5 hover:border-purple-500/30 transition-all duration-300 shadow-2xl backdrop-blur-md overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-bl-full filter blur-md opacity-20 group-hover:opacity-40 transition-opacity" />
                 
-                <div className="p-8 relative z-10">
-                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                    <FlaskConical className="w-8 h-8 text-white" />
-                  </div>
-                  
-                  <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                    I&apos;m a Researcher
-                  </h2>
-                  
-                  <p className="text-gray-600 mb-6 leading-relaxed">
-                    Collaborate with peers, manage clinical trials, engage with patients, and expand your research network with AI-powered tools.
-                  </p>
-                  
-                  <div className="flex items-center text-purple-600 font-semibold group-hover:translate-x-2 transition-transform">
-                    Get Started
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </div>
+                <div className="w-14 h-14 bg-purple-500/10 group-hover:bg-purple-500/20 border border-purple-500/20 rounded-2xl flex items-center justify-center mb-6 transition-all duration-300">
+                  <FlaskConical className="w-6 h-6 text-purple-400" />
+                </div>
+                
+                <h2 className="text-2xl font-bold text-white mb-3 tracking-tight">
+                  I&apos;m a Researcher
+                </h2>
+                
+                <p className="text-slate-400 mb-8 leading-relaxed font-light text-sm sm:text-base">
+                  Collaborate with peers, manage clinical trials, engage with patients, and expand your research network with AI-powered tools.
+                </p>
+                
+                <div className="flex items-center text-purple-400 font-semibold group-hover:text-purple-300 transition-colors">
+                  <span>Get Started</span>
+                  <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1.5 transition-transform" />
                 </div>
               </div>
             </motion.div>
           </motion.div>
 
           {/* Key Features Grid */}
-          <motion.div variants={itemVariants} className="mt-24">
-            <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
+          <motion.div variants={itemVariants} className="mb-28">
+            <h2 className="text-3xl sm:text-4xl font-bold text-center text-white mb-16 tracking-tight">
               Everything You Need in One Platform
             </h2>
-            <div className="grid md:grid-cols-3 gap-8">
-              <div className="text-center p-6 rounded-2xl hover:bg-white hover:shadow-lg transition-all">
-                <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-7 h-7 text-blue-600" />
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[
+                { icon: Search, color: 'text-indigo-400', bg: 'bg-indigo-500/5', title: 'Smart Search', desc: 'Find clinical trials, publications, and researchers from PubMed, arXiv, ORCID, and more.' },
+                { icon: Brain, color: 'text-purple-400', bg: 'bg-purple-500/5', title: 'Cura AI Assistant', desc: 'Get instant, simple explanations about complex trials, research details, and medical concepts.' },
+                { icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-500/5', title: 'Expert Network', desc: 'Connect with verified researchers, schedule digital meetings, and collaborate seamlessly.' },
+                { icon: MessageSquare, color: 'text-pink-400', bg: 'bg-pink-500/5', title: 'Community Forums', desc: 'Engage in moderated discussions, share personal experiences, and find patient support.' },
+                { icon: Bell, color: 'text-rose-400', bg: 'bg-rose-500/5', title: 'Real-time Notifications', desc: 'Stay updated on trial phases, replies to your discussions, and breakthroughs in your interest areas.' },
+                { icon: BookOpen, color: 'text-cyan-400', bg: 'bg-cyan-500/5', title: 'Research Library', desc: 'Access millions of scientific publications with advanced contextual filtering and AI summaries.' }
+              ].map((feature, idx) => (
+                <div 
+                  key={idx} 
+                  className="bg-white/[0.01] hover:bg-white/[0.03] p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-all duration-300 group shadow-md"
+                >
+                  <div className={`w-12 h-12 ${feature.bg} rounded-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform`}>
+                    <feature.icon className={`w-6 h-6 ${feature.color}`} />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2 tracking-tight">{feature.title}</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed font-light">{feature.desc}</p>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Smart Search</h3>
-                <p className="text-gray-600 text-sm">
-                  Find clinical trials, publications, and researchers from PubMed, arXiv, ORCID, and more
-                </p>
-              </div>
-              
-              <div className="text-center p-6 rounded-2xl hover:bg-white hover:shadow-lg transition-all">
-                <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <Brain className="w-7 h-7 text-purple-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">AI Assistant</h3>
-                <p className="text-gray-600 text-sm">
-                  Get instant answers about trials, research, and medical information with Cura AI
-                </p>
-              </div>
-              
-              <div className="text-center p-6 rounded-2xl hover:bg-white hover:shadow-lg transition-all">
-                <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-7 h-7 text-green-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Expert Network</h3>
-                <p className="text-gray-600 text-sm">
-                  Connect with verified researchers, schedule meetings, and collaborate seamlessly
-                </p>
-              </div>
-              
-              <div className="text-center p-6 rounded-2xl hover:bg-white hover:shadow-lg transition-all">
-                <div className="w-14 h-14 bg-orange-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <MessageSquare className="w-7 h-7 text-orange-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Community Forums</h3>
-                <p className="text-gray-600 text-sm">
-                  Engage in discussions, share experiences, and get support from the community
-                </p>
-              </div>
-              
-              <div className="text-center p-6 rounded-2xl hover:bg-white hover:shadow-lg transition-all">
-                <div className="w-14 h-14 bg-red-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <Bell className="w-7 h-7 text-red-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Real-time Notifications</h3>
-                <p className="text-gray-600 text-sm">
-                  Stay updated on new trials, messages, and research relevant to your interests
-                </p>
-              </div>
-              
-              <div className="text-center p-6 rounded-2xl hover:bg-white hover:shadow-lg transition-all">
-                <div className="w-14 h-14 bg-indigo-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <BookOpen className="w-7 h-7 text-indigo-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Research Library</h3>
-                <p className="text-gray-600 text-sm">
-                  Access millions of publications with advanced filtering and AI summaries
-                </p>
-              </div>
+              ))}
             </div>
           </motion.div>
 
           {/* Platform Stats */}
-          <motion.div variants={itemVariants} className="mt-24 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-12 text-white">
-            <div className="grid md:grid-cols-4 gap-8 text-center">
-              <div>
-                <div className="text-4xl font-bold mb-2">10K+</div>
-                <div className="text-blue-100">Clinical Trials</div>
-              </div>
-              <div>
-                <div className="text-4xl font-bold mb-2">5M+</div>
-                <div className="text-blue-100">Publications</div>
-              </div>
-              <div>
-                <div className="text-4xl font-bold mb-2">1K+</div>
-                <div className="text-blue-100">Researchers</div>
-              </div>
-              <div>
-                <div className="text-4xl font-bold mb-2">24/7</div>
-                <div className="text-blue-100">AI Support</div>
-              </div>
+          <motion.div 
+            variants={itemVariants} 
+            className="mb-28 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-transparent rounded-3xl p-10 sm:p-12 border border-white/5 shadow-2xl relative overflow-hidden group hover:border-indigo-500/20 transition-all duration-500"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center relative z-10">
+              {[
+                { label: 'Clinical Trials', value: '10K+' },
+                { label: 'Publications', value: '5M+' },
+                { label: 'Researchers', value: '1K+' },
+                { label: 'AI Support', value: '24/7' }
+              ].map((stat, idx) => (
+                <div key={idx}>
+                  <div className="text-4xl sm:text-5xl font-extrabold text-white mb-2 bg-gradient-to-r from-white via-indigo-200 to-purple-300 bg-clip-text text-transparent tracking-tight">
+                    {stat.value}
+                  </div>
+                  <div className="text-xs sm:text-sm text-slate-400 font-light tracking-wide uppercase">{stat.label}</div>
+                </div>
+              ))}
             </div>
           </motion.div>
 
-          {/* For Patients Section */}
-          <motion.div variants={itemVariants} className="mt-24">
+          {/* Detailed Features: Patients & Researchers */}
+          <motion.div variants={itemVariants} className="space-y-28 mb-28">
+            {/* For Patients */}
             <div className="grid md:grid-cols-2 gap-12 items-center">
               <div>
-                <div className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-50 rounded-full mb-4">
-                  <Heart className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-600">For Patients</span>
+                <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full mb-6 text-xs sm:text-sm text-indigo-300">
+                  <Heart className="w-4 h-4 text-indigo-400" />
+                  <span>For Patients</span>
                 </div>
-                <h2 className="text-4xl font-bold text-gray-900 mb-6">
+                <h2 className="text-3xl sm:text-4xl font-bold text-white mb-6 tracking-tight">
                   Your Health Journey, Simplified
                 </h2>
-                <p className="text-gray-600 mb-8 leading-relaxed">
-                  CuraLink empowers patients with tools to discover relevant clinical trials, 
-                  connect with expert researchers, and stay informed about the latest medical research.
+                <p className="text-slate-400 mb-8 leading-relaxed font-light">
+                  CuraLink empowers patients with simple search mechanisms and direct connections to research institutes. Stay updated and feel confident about clinical trial options.
                 </p>
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="font-semibold text-gray-900">Personalized Trial Matching</h4>
-                      <p className="text-sm text-gray-600">Find trials that match your condition, location, and preferences</p>
+                <div className="space-y-5">
+                  {[
+                    { title: 'Personalized Trial Matching', desc: 'Find ongoing studies matching your specific medical records, preferred locations, and settings.' },
+                    { title: 'Direct Researcher Contact', desc: 'Securely message leading specialists, request virtual consultations, and clear doubt factors.' },
+                    { title: 'Latest Research Updates', desc: 'Track breakthroughs, journals, and community insights in real-time.' }
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex items-start space-x-3">
+                      <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-white tracking-tight">{item.title}</h4>
+                        <p className="text-sm text-slate-400 leading-relaxed font-light mt-0.5">{item.desc}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="font-semibold text-gray-900">Direct Researcher Contact</h4>
-                      <p className="text-sm text-gray-600">Message researchers, request meetings, and get your questions answered</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="font-semibold text-gray-900">Latest Research Updates</h4>
-                      <p className="text-sm text-gray-600">Stay informed about new publications and breakthroughs in your area</p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
-              <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-3xl p-8 border border-gray-100">
+              <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-8 shadow-2xl backdrop-blur-md relative overflow-hidden group hover:border-indigo-500/10 transition-all duration-300">
                 <div className="space-y-4">
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <FlaskConical className="w-5 h-5 text-blue-600" />
+                  {[
+                    { title: 'Phase 3 Trial', status: 'Recruiting Now', desc: 'Novel targeted immunotherapy for advanced melanoma.', icon: FlaskConical, color: 'text-indigo-400', bg: 'bg-indigo-500/10' },
+                    { title: 'Dr. Evelyn Martinez', status: 'Oncology Expert', desc: 'Available for digital consults & trial inquiries.', icon: UserCheck, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+                    { title: 'New Publication Summary', status: 'PubMed Insight', desc: 'Long-term efficacy data on early-stage CAR-T therapies.', icon: BookOpen, color: 'text-emerald-400', bg: 'bg-emerald-500/10' }
+                  ].map((card, idx) => (
+                    <div key={idx} className="bg-white/[0.02] hover:bg-white/[0.04] rounded-2xl p-4 border border-white/5 hover:border-white/10 transition-all duration-300 shadow-sm flex items-start space-x-4">
+                      <div className={`w-10 h-10 ${card.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                        <card.icon className={`w-5 h-5 ${card.color}`} />
                       </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900">Phase 3 Trial</div>
-                        <div className="text-sm text-gray-500">Recruiting Now</div>
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-600">New treatment for Type 2 Diabetes</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <UserCheck className="w-5 h-5 text-purple-600" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900">Dr. Sarah Johnson</div>
-                        <div className="text-sm text-gray-500">Oncology Researcher</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="font-semibold text-white text-sm tracking-tight">{card.title}</h4>
+                          <span className="text-[10px] font-medium text-slate-400 bg-white/5 px-2 py-0.5 rounded-full">{card.status}</span>
+                        </div>
+                        <p className="text-xs text-slate-400 leading-relaxed font-light">{card.desc}</p>
                       </div>
                     </div>
-                    <div className="text-sm text-gray-600">Available for consultation</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                        <BookOpen className="w-5 h-5 text-green-600" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900">New Publication</div>
-                        <div className="text-sm text-gray-500">PubMed</div>
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-600">Breakthrough in immunotherapy</div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
-          </motion.div>
 
-          {/* For Researchers Section */}
-          <motion.div variants={itemVariants} className="mt-24">
+            {/* For Researchers */}
             <div className="grid md:grid-cols-2 gap-12 items-center">
-              <div className="order-2 md:order-1 bg-gradient-to-br from-purple-50 to-blue-50 rounded-3xl p-8 border border-gray-100">
+              <div className="order-2 md:order-1 bg-white/[0.02] border border-white/5 rounded-3xl p-8 shadow-2xl backdrop-blur-md relative overflow-hidden group hover:border-purple-500/10 transition-all duration-300">
                 <div className="space-y-4">
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <Users className="w-5 h-5 text-purple-600" />
+                  {[
+                    { title: 'Global Collaboration Network', status: '15 Active Sites', desc: 'Joint clinical trial dataset sharing across institutions.', icon: Users, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+                    { title: 'Trial Enrollment Metrics', status: '85% Target Achieved', desc: 'Real-time patient pre-screening pipelines via Cura AI.', icon: Database, color: 'text-indigo-400', bg: 'bg-indigo-500/10' },
+                    { title: 'Patient Inquiries Queue', status: '12 New Inquiries', desc: 'Automated categorization and priority flagging.', icon: TrendingUp, color: 'text-pink-400', bg: 'bg-pink-500/10' }
+                  ].map((card, idx) => (
+                    <div key={idx} className="bg-white/[0.02] hover:bg-white/[0.04] rounded-2xl p-4 border border-white/5 hover:border-white/10 transition-all duration-300 shadow-sm flex items-start space-x-4">
+                      <div className={`w-10 h-10 ${card.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                        <card.icon className={`w-5 h-5 ${card.color}`} />
                       </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900">Collaboration Network</div>
-                        <div className="text-sm text-gray-500">250+ Connections</div>
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-600">Connect with peers worldwide</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Database className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900">Trial Management</div>
-                        <div className="text-sm text-gray-500">12 Active Trials</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="font-semibold text-white text-sm tracking-tight">{card.title}</h4>
+                          <span className="text-[10px] font-medium text-slate-400 bg-white/5 px-2 py-0.5 rounded-full">{card.status}</span>
+                        </div>
+                        <p className="text-xs text-slate-400 leading-relaxed font-light">{card.desc}</p>
                       </div>
                     </div>
-                    <div className="text-sm text-gray-600">Manage all your research in one place</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                        <TrendingUp className="w-5 h-5 text-orange-600" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900">Patient Engagement</div>
-                        <div className="text-sm text-gray-500">45 New Inquiries</div>
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-600">Direct patient communication</div>
-                  </div>
+                  ))}
                 </div>
               </div>
               <div className="order-1 md:order-2">
-                <div className="inline-flex items-center space-x-2 px-4 py-2 bg-purple-50 rounded-full mb-4">
-                  <FlaskConical className="w-4 h-4 text-purple-600" />
-                  <span className="text-sm font-medium text-purple-600">For Researchers</span>
+                <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-purple-500/10 border border-purple-500/20 rounded-full mb-6 text-xs sm:text-sm text-purple-300">
+                  <FlaskConical className="w-4 h-4 text-purple-400" />
+                  <span>For Researchers</span>
                 </div>
-                <h2 className="text-4xl font-bold text-gray-900 mb-6">
-                  Accelerate Your Research
+                <h2 className="text-3xl sm:text-4xl font-bold text-white mb-6 tracking-tight">
+                  Accelerate Scientific Research
                 </h2>
-                <p className="text-gray-600 mb-8 leading-relaxed">
-                  Streamline your research workflow with powerful tools for collaboration, 
-                  trial management, and patient engagement.
+                <p className="text-slate-400 mb-8 leading-relaxed font-light">
+                  Streamline participant recruitment, coordinate with peers, catalog publications, and harness advanced machine learning summary tools to fast-track discoveries.
                 </p>
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="font-semibold text-gray-900">Centralized Trial Management</h4>
-                      <p className="text-sm text-gray-600">Track all your clinical trials, publications, and collaborations</p>
+                <div className="space-y-5">
+                  {[
+                    { title: 'Centralized Trial Management', desc: 'Monitor active and draft clinical studies, record milestones, and share status reports.' },
+                    { title: 'Global Researcher Network', desc: 'Find co-investigators, cross-verify research findings, and publish joint preprints.' },
+                    { title: 'AI Patient Recruitment', desc: 'Match with eligible pre-screened patients who voluntarily apply to join research programs.' }
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex items-start space-x-3">
+                      <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-white tracking-tight">{item.title}</h4>
+                        <p className="text-sm text-slate-400 leading-relaxed font-light mt-0.5">{item.desc}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="font-semibold text-gray-900">Global Researcher Network</h4>
-                      <p className="text-sm text-gray-600">Find collaborators, share insights, and expand your network</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="font-semibold text-gray-900">Patient Recruitment Tools</h4>
-                      <p className="text-sm text-gray-600">Connect with eligible patients interested in your trials</p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
           </motion.div>
 
-          {/* Data Sources */}
-          <motion.div variants={itemVariants} className="mt-24">
-            <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">
+          {/* Trusted Sources */}
+          <motion.div variants={itemVariants} className="mb-28 text-center">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 tracking-tight">
               Powered by Trusted Sources
             </h2>
-            <p className="text-center text-gray-600 mb-12 max-w-2xl mx-auto">
-              We aggregate data from leading medical and research databases to provide comprehensive, up-to-date information
+            <p className="text-slate-400 mb-12 max-w-2xl mx-auto font-light text-sm sm:text-base">
+              We aggregate data from leading global repositories to provide accurate, comprehensive insights.
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-              <div className="text-center p-6 bg-white rounded-xl border border-gray-100">
-                <div className="font-semibold text-gray-900 mb-1">PubMed</div>
-                <div className="text-sm text-gray-500">35M+ Articles</div>
-              </div>
-              <div className="text-center p-6 bg-white rounded-xl border border-gray-100">
-                <div className="font-semibold text-gray-900 mb-1">ClinicalTrials.gov</div>
-                <div className="text-sm text-gray-500">450K+ Trials</div>
-              </div>
-              <div className="text-center p-6 bg-white rounded-xl border border-gray-100">
-                <div className="font-semibold text-gray-900 mb-1">ORCID</div>
-                <div className="text-sm text-gray-500">16M+ Researchers</div>
-              </div>
-              <div className="text-center p-6 bg-white rounded-xl border border-gray-100">
-                <div className="font-semibold text-gray-900 mb-1">arXiv</div>
-                <div className="text-sm text-gray-500">2M+ Preprints</div>
-              </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {[
+                { title: 'PubMed', detail: '35M+ Articles' },
+                { title: 'ClinicalTrials.gov', detail: '450K+ Trials' },
+                { title: 'ORCID', detail: '16M+ Researchers' },
+                { title: 'arXiv', detail: '2M+ Preprints' }
+              ].map((source, idx) => (
+                <div 
+                  key={idx} 
+                  className="bg-white/[0.01] hover:bg-white/[0.03] p-5 rounded-2xl border border-white/5 hover:border-indigo-500/20 transition-all duration-300 group"
+                >
+                  <div className="font-bold text-white mb-1 tracking-tight text-lg group-hover:text-indigo-300 transition-colors">{source.title}</div>
+                  <div className="text-xs text-slate-400 font-light">{source.detail}</div>
+                </div>
+              ))}
             </div>
           </motion.div>
 
           {/* Final CTA */}
-          <motion.div variants={itemVariants} className="mt-24 text-center">
-            <h2 className="text-4xl font-bold text-gray-900 mb-6">
-              Ready to Get Started?
+          <motion.div 
+            variants={itemVariants} 
+            className="text-center bg-gradient-to-t from-indigo-500/10 via-purple-500/5 to-transparent rounded-3xl p-12 border border-indigo-500/10 shadow-2xl relative overflow-hidden"
+          >
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-white mb-6 tracking-tight leading-tight">
+              Ready to Transform Healthcare?
             </h2>
-            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-              Join thousands of patients and researchers transforming healthcare together
+            <p className="text-slate-400 mb-10 max-w-2xl mx-auto font-light text-base sm:text-lg">
+              Join thousands of patients and researchers collaborate to unlock medical solutions together.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={() => router.push('/patient/onboarding')}
-                className="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:shadow-lg transition-all flex items-center justify-center space-x-2"
+                className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/20 transition-all duration-300 flex items-center justify-center space-x-2"
               >
                 <span>Start as Patient</span>
                 <ArrowRight className="w-5 h-5" />
               </button>
               <button
                 onClick={() => router.push('/researcher/onboarding')}
-                className="px-8 py-4 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl font-semibold hover:shadow-lg transition-all flex items-center justify-center space-x-2"
+                className="px-8 py-4 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 flex items-center justify-center space-x-2"
               >
                 <span>Start as Researcher</span>
                 <ArrowRight className="w-5 h-5" />
@@ -469,16 +380,11 @@ export default function LandingPage() {
       </main>
 
       {/* Footer */}
-      <motion.footer 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1 }}
-        className="border-t border-gray-100 py-8"
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500 text-sm">
-          <p>&copy; 2025 CuraLink. Transforming healthcare through AI and collaboration.</p>
+      <footer className="border-t border-white/5 py-10 relative z-10 bg-[#030014]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-slate-500 text-sm font-light">
+          <p>&copy; {new Date().getFullYear()} CuraLink. Connecting patients and researchers with AI and integrity.</p>
         </div>
-      </motion.footer>
+      </footer>
     </div>
   );
 }

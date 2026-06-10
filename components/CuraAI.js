@@ -74,15 +74,15 @@ export default function CuraAI() {
       {/* Floating AI Button - Middle position */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-4 right-[52px] sm:right-[58px] z-50 p-2 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 group"
+        className="fixed top-4 right-[72px] z-50 p-2.5 bg-white/95 dark:bg-slate-900/95 border border-slate-200/80 dark:border-slate-800 backdrop-blur-md rounded-xl shadow-md hover:shadow-lg hover:border-indigo-500/20 dark:hover:border-indigo-500/30 transition-all duration-300 hover:scale-105 group"
         aria-label="Cura AI Assistant"
       >
         {isOpen ? (
-          <X className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+          <X className="w-4 h-4 sm:w-5 sm:h-5 text-slate-700 dark:text-slate-200" />
         ) : (
           <div className="relative">
-            <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-            <Sparkles className="w-2 h-2 text-yellow-300 absolute -top-1 -right-1 animate-pulse" />
+            <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
+            <Sparkles className="w-2 h-2 text-indigo-500 absolute -top-1 -right-1 animate-pulse" />
           </div>
         )}
       </button>
@@ -92,18 +92,18 @@ export default function CuraAI() {
         <>
 
           {/* Chat Window - Responsive */}
-          <div className="fixed top-16 sm:top-20 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 h-[70vh] sm:h-[600px] z-50 bg-white rounded-xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+          <div className="fixed top-16 sm:top-20 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 h-[70vh] sm:h-[600px] z-50 bg-white/95 border border-slate-200/80 backdrop-blur-md rounded-2xl shadow-2xl flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-500 to-indigo-600 p-4 text-white">
+            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 p-4 text-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <Bot className="w-8 h-8" />
-                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
+                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white"></div>
                   </div>
                   <div>
-                    <h3 className="font-bold text-lg">Cura AI</h3>
-                    <p className="text-xs text-purple-100">Medical Research Assistant</p>
+                    <h3 className="font-bold text-lg tracking-tight">Cura AI</h3>
+                    <p className="text-xs text-indigo-100">Medical Research Assistant</p>
                   </div>
                 </div>
                 <button

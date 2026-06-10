@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Menu, 
@@ -18,10 +18,35 @@ import {
   ArrowRightLeft,
   GraduationCap,
   Settings,
-  Shield
-} from 'lucide-react';export default function HamburgerMenu({ activeSection, onSectionChange, user, onLogout, isResearcher = false }) {
+  Shield,
+  Sun,
+  Moon,
+  Stethoscope
+} from 'lucide-react';
+
+export default function HamburgerMenu({ activeSection, onSectionChange, user, onLogout, isResearcher = false }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const router = useRouter();
+
+  // Sync state with DOM class on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsDarkMode(document.documentElement.classList.contains('dark'));
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    if (newMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
 
   const patientMenuItems = [
     {
@@ -147,30 +172,44 @@ import {
 
   return (
     <>
+      {/* Theme Toggle Button - Near Bell Icon (right-[184px]) */}
+      <button
+        onClick={toggleDarkMode}
+        className="fixed top-4 right-[184px] z-50 p-2.5 bg-white/95 dark:bg-slate-900/95 border border-slate-200/80 dark:border-slate-800 backdrop-blur-md rounded-xl shadow-md hover:shadow-lg hover:border-indigo-500/20 dark:hover:border-indigo-500/30 transition-all duration-300 hover:scale-105"
+        aria-label="Toggle Theme"
+        title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+      >
+        {isDarkMode ? (
+          <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
+        ) : (
+          <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500" />
+        )}
+      </button>
+
       {/* Hamburger Button - Rightmost */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-4 right-4 z-50 p-2 bg-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+        className="fixed top-4 right-4 z-50 p-2.5 bg-white/95 dark:bg-slate-900/95 border border-slate-200/80 dark:border-slate-800 backdrop-blur-md rounded-xl shadow-md hover:shadow-lg hover:border-indigo-500/20 dark:hover:border-indigo-500/30 transition-all duration-300 hover:scale-105"
         aria-label="Menu"
       >
         {isOpen ? (
-          <X className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
+          <X className="w-4 h-4 sm:w-5 sm:h-5 text-slate-700 dark:text-slate-200" />
         ) : (
-          <Menu className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
+          <Menu className="w-4 h-4 sm:w-5 sm:h-5 text-slate-700 dark:text-slate-200" />
         )}
       </button>
 
       {/* Sidebar Menu - Responsive width */}
       <div
-        className={`fixed top-0 right-0 h-full w-full sm:w-80 max-w-sm bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 h-full w-full sm:w-80 max-w-sm sidebar-drawer shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/40 dark:from-slate-900/50 dark:to-indigo-950/20 dark:border-slate-800">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-gray-800">Curalink</h2>
+              <div />
               <button
                 onClick={() => setIsOpen(false)}
                 className="p-2 hover:bg-white rounded-lg transition-colors"
@@ -214,10 +253,10 @@ import {
                   <button
                     key={item.id}
                     onClick={() => handleSectionClick(item.id)}
-                    className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all duration-200 group ${
+                    className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all duration-300 group ${
                       isActive
-                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md'
-                        : 'hover:bg-gray-50 text-gray-700'
+                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/10'
+                        : 'hover:bg-slate-50 text-slate-700'
                     }`}
                   >
                     <div className={`p-2 rounded-lg ${

@@ -1,11 +1,11 @@
 'use client';
 
 export function Card({ children, className = '', hover = false, onClick }) {
-  const hoverStyles = hover ? 'hover:shadow-xl hover:-translate-y-1 cursor-pointer' : '';
+  const hoverStyles = hover ? 'hover:shadow-lg hover:shadow-indigo-500/5 hover:-translate-y-1 hover:border-indigo-500/20 cursor-pointer' : '';
   
   return (
     <div 
-      className={`bg-white rounded-2xl shadow-md border border-gray-100 transition-all duration-300 ${hoverStyles} ${className}`}
+      className={`bg-white/95 backdrop-blur-md rounded-2xl shadow-sm border border-slate-200/60 transition-all duration-300 ${hoverStyles} ${className}`}
       onClick={onClick}
     >
       {children}

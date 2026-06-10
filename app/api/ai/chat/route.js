@@ -28,7 +28,7 @@ export async function POST(request) {
 
     // Initialize Gemini model with safety settings
     // Use model from env or default to gemini-pro
-    const modelName = process.env.GEMINI_MODEL || 'gemini-pro';
+    const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     console.log('Using Gemini model:', modelName);
     
     const model = genAI.getGenerativeModel({ 

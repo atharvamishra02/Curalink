@@ -18,12 +18,11 @@ export default function NotificationBell({ user }) {
     console.log('Rendering bell for non-logged-in user');
     return (
       <button
-        className="fixed top-4 right-[120px] sm:right-[140px] z-[9999] p-2 bg-gradient-to-r from-red-500 to-pink-600 rounded-lg shadow-2xl hover:shadow-3xl transition-all duration-200 hover:scale-110 border-2 border-white animate-pulse"
+        className="fixed top-4 right-[128px] z-[9999] p-2.5 bg-white/95 dark:bg-slate-900/95 border border-slate-200/80 dark:border-slate-800 backdrop-blur-md rounded-xl shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
         aria-label="Notifications"
         title="Login to see notifications"
-        style={{ boxShadow: '0 0 20px rgba(239, 68, 68, 0.5)' }}
       >
-        <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+        <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-slate-700 dark:text-slate-200" />
       </button>
     );
   }
@@ -141,19 +140,18 @@ export default function NotificationBell({ user }) {
 
   return (
     <>
-      {/* Notification Bell Button - SUPER VISIBLE */}
+      {/* Notification Bell Button - PREMIUM GLASS STYLE */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-4 right-[88px] sm:right-[96px] z-[9999] p-2 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg shadow-2xl hover:shadow-3xl transition-all duration-200 hover:scale-110 border-2 border-white"
+        className="fixed top-4 right-[128px] z-[9999] p-2.5 bg-white/95 dark:bg-slate-900/95 border border-slate-200/80 dark:border-slate-800 backdrop-blur-md rounded-xl shadow-md hover:shadow-lg hover:border-indigo-500/20 dark:hover:border-indigo-500/30 transition-all duration-300 hover:scale-105"
         aria-label="Notifications"
-        style={{ boxShadow: '0 0 20px rgba(59, 130, 246, 0.5)' }}
       >
-        <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+        <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-slate-700 dark:text-slate-200" />
         {unreadCount > 0 && (
           <motion.span
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className="absolute -top-2 -right-2 bg-red-500 text-white text-sm font-bold rounded-full min-w-7 h-7 flex items-center justify-center px-2 border-4 border-white shadow-lg animate-bounce"
+            className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-bold rounded-full min-w-5 h-5 flex items-center justify-center px-1 border-2 border-white shadow-md"
           >
             {unreadCount > 99 ? '99+' : unreadCount}
           </motion.span>
@@ -169,10 +167,10 @@ export default function NotificationBell({ user }) {
               initial={{ opacity: 0, y: -20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
-              className="fixed top-16 sm:top-20 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 max-h-[70vh] sm:max-h-[600px] z-[80] bg-white rounded-xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+              className="fixed top-16 sm:top-20 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 max-h-[70vh] sm:max-h-[600px] z-[80] bg-white/95 border border-slate-200/80 backdrop-blur-md rounded-2xl shadow-2xl flex flex-col overflow-hidden"
             >
               {/* Header */}
-              <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/30">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-bold text-lg text-gray-800">Notifications</h3>
                   <button

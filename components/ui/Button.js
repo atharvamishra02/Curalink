@@ -20,11 +20,11 @@ export function Button({
   
   const variantStyles = useMemo(() => {
     const styles = {
-      primary: 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 focus:ring-blue-500 shadow-lg hover:shadow-xl',
-      secondary: 'bg-white text-gray-700 border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 focus:ring-gray-500',
-      outline: 'bg-transparent border-2 border-blue-600 text-blue-600 hover:bg-blue-50 focus:ring-blue-500',
-      ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
-      danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+      primary: 'bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white hover:opacity-95 focus:ring-indigo-500 shadow-md hover:shadow-lg hover:shadow-indigo-500/25',
+      secondary: 'bg-slate-100 text-slate-800 hover:bg-slate-200/80 border border-slate-200/60 focus:ring-slate-400',
+      outline: 'bg-transparent border border-indigo-600/80 text-indigo-600 hover:bg-indigo-50/50 focus:ring-indigo-500',
+      ghost: 'bg-transparent text-slate-600 hover:bg-slate-100 focus:ring-slate-400',
+      danger: 'bg-rose-500 text-white hover:bg-rose-600 focus:ring-rose-400 shadow-sm',
     };
     return styles[variant] || styles.primary;
   }, [variant]);

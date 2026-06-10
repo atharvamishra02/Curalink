@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Heart } from 'lucide-react';
+import { ArrowLeft, Stethoscope } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -124,7 +124,7 @@ export default function ResearcherOnboarding() {
             <span>Back</span>
           </button>
           <div className="flex items-center space-x-2">
-            <Heart className="w-6 h-6 text-blue-600" />
+            <Stethoscope className="w-6 h-6 text-blue-600" />
             <span className="text-xl font-bold">CuraLink</span>
           </div>
         </div>

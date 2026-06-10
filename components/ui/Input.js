@@ -28,14 +28,14 @@ export const Input = forwardRef(function Input({
         <input
           ref={ref}
           className={`
-            block w-full rounded-xl border-2 py-3 px-4
-            bg-white
-            text-gray-900
+            block w-full rounded-xl border py-3 px-4
+            bg-white/80 backdrop-blur-sm
+            text-slate-900
             ${Icon ? 'pl-10' : ''}
-            ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-blue-500 focus:ring-blue-500'}
-            focus:outline-none focus:ring-2 focus:ring-offset-0
-            placeholder:text-gray-400
-            transition-colors
+            ${error ? 'border-rose-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20' : 'border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20'}
+            focus:outline-none
+            placeholder:text-slate-400
+            transition-all duration-200
             ${className}
           `}
           {...props}

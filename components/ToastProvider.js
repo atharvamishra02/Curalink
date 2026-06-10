@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 const ToastContext = createContext(null);
 
@@ -8,32 +8,81 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const remove = useCallback((id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    setToasts((prev) => {
+      const updated = prev.filter((t) => t.id !== id);
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('active_toasts', JSON.stringify(updated));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      return updated;
+    });
   }, []);
 
   const push = useCallback(({ title, description, type = 'info', duration = 4000 }) => {
     const id = Math.random().toString(36).slice(2);
     const toast = { id, title, description, type };
-    setToasts((prev) => [toast, ...prev].slice(0, 5));
+    setToasts((prev) => {
+      const updated = [toast, ...prev].slice(0, 5);
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('active_toasts', JSON.stringify(updated));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      return updated;
+    });
     if (duration > 0) {
       setTimeout(() => remove(id), duration);
     }
     return id;
   }, [remove]);
 
-  const api = useMemo(() => ({
-    show: push,
-    success: (opts) => push({ type: 'success', ...opts }),
-    error: (opts) => push({ type: 'error', ...opts }),
-    info: (opts) => push({ type: 'info', ...opts }),
-    remove,
-  }), [push, remove]);
+  // Restore active toasts on mount (persisting across page reloads)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = sessionStorage.getItem('active_toasts');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setToasts(parsed);
+            // Schedule auto-removal for all restored toasts
+            parsed.forEach((t) => {
+              setTimeout(() => remove(t.id), 4000);
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Error loading active toasts:', e);
+      }
+    }
+  }, [remove]);
+
+  const api = useMemo(() => {
+    const normalize = (opts) => {
+      if (typeof opts === 'string') {
+        return { description: opts };
+      }
+      return opts;
+    };
+    return {
+      show: (opts) => push(normalize(opts)),
+      success: (opts) => push({ type: 'success', ...normalize(opts) }),
+      error: (opts) => push({ type: 'error', ...normalize(opts) }),
+      info: (opts) => push({ type: 'info', ...normalize(opts) }),
+      remove,
+    };
+  }, [push, remove]);
 
   return (
     <ToastContext.Provider value={api}>
       {children}
       {/* Toasts Container */}
-      <div className="fixed top-4 right-4 z-[100] flex flex-col items-end gap-2">
+      <div className="fixed bottom-4 right-4 z-[100] flex flex-col-reverse items-end gap-2">
         {toasts.map((t) => (
           <div
             key={t.id}
