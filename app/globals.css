@@ -127,6 +127,14 @@ body {
   color: #f8fafc !important;
 }
 
+/* Clear page-level wrappers' light backgrounds and gradients in dark mode */
+.dark .min-h-screen.bg-gradient-to-br,
+.dark .min-h-screen.bg-gray-50 {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+
 /* Frosted glass cards */
 .dark .glass-panel {
   background: rgba(13, 10, 37, 0.45) !important;
